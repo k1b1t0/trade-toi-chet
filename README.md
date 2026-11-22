@@ -48,9 +48,12 @@ uv run python -m src.ingestion.cli
 
 ---
 
-## 3. Tài Liệu Kiến Trúc & Phân Công Nhóm
+## 3. Tài Liệu Kiến Trúc, Phân Hệ & Phân Công Nhóm
 
-- [Kế hoạch Tổng thể & Ánh xạ môn học 02-ds (L1-L12)](docs/architecture/PLAN.md)
+- **Tài liệu Kỹ thuật từng Phân hệ (`docs/modules/`)**:
+  - [Phân hệ 01: Thu thập Dữ liệu Đa nguồn & Anti-Ban Web Crawling (`src/ingestion/`)](docs/modules/01-ingestion.md)
+- **Tài liệu Kiến trúc Hệ thống (`docs/architecture/`)**:
+  - [Kế hoạch Tổng thể & Ánh xạ môn học 02-ds (L1-L12)](docs/architecture/PLAN.md)
 - [Cấu trúc Thư mục & Quyền sở hữu File](docs/architecture/STRUCTURE.md)
 - [Sơ đồ Luồng dữ liệu & Luồng phối hợp](docs/architecture/FLOW.md)
 - [Hợp đồng Schema Dữ liệu & Giao diện Hàm](docs/architecture/API_CONTRACTS.md)
