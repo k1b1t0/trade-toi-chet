@@ -89,17 +89,17 @@ Toàn bộ mã nguồn được chia thành **7 file nhỏ gọn** (mỗi file c
 
 ---
 
-## 4. Phương Pháp Chấm Điểm Cảm Xúc Tin Tức Tiếng Việt (`src/ingestion/sentiment.py`)
+## 4. Mô Hình Hybrid NLP Chấm Điểm Cảm Xúc Tiếng Việt (`src/ingestion/sentiment.py`)
 
-Với mỗi tiêu đề bài báo $h$ thu thập được, hệ thống chuyển về chữ thường và đếm số lượng từ khóa tích cực ($N_{\text{pos}}$) cùng số lượng từ khóa tiêu cực ($N_{\text{neg}}$) xuất hiện trong tiêu đề:
+Thay vì chỉ dùng từ điển cứng hoặc dùng các mô hình Deep Learning hàng trăm MB cần GPU, phân hệ sử dụng kiến trúc **Hybrid NLP (Từ điển chuyên ngành + Mô hình Học máy `TfidfVectorizer(ngram_range=(1, 2))` & `LogisticRegression` của `scikit-learn`)**:
 
-$$\text{Sentiment Score}(h) = \text{clip}\left( \frac{N_{\text{pos}} - N_{\text{neg}}}{N_{\text{pos}} + N_{\text{neg}} + 0.5}, \; -1.0, \; +1.0 \right)$$
-
-- Hằng số làm trơn $0.5$ ở mẫu số giúp điều tiết điểm số:
-  - Nếu tiêu đề có 1 từ khóa tích cực và 0 từ tiêu cực $\to \text{Score} = \frac{1}{1.5} \approx +0.6667$.
-  - Nếu tiêu đề có từ 2 từ khóa tích cực trở lên và 0 từ tiêu cực $\to \text{Score} \ge +0.80$.
-  - Nếu tiêu đề là tin thông báo hành chính trung lập ($N_{\text{pos}} = N_{\text{neg}} = 0$) $\to \text{Score} = 0.0$.
-- Trong trường hợp một mã cổ phiếu có nhiều bài báo trong cùng một ngày $t$, điểm cảm xúc của ngày đó là trung bình cộng điểm của tất cả các bài báo phát sinh trong ngày.
+1. **Thành phần 1 — Điểm từ điển chuyên ngành ($\text{Score}_{\text{lex}}$)**:
+   $$\text{Score}_{\text{lex}}(h) = \frac{N_{\text{pos}} - N_{\text{neg}}}{N_{\text{pos}} + N_{\text{neg}} + 0.5}$$
+2. **Thành phần 2 — Xác suất mô hình Học máy TF-IDF + Logistic Regression ($\text{Score}_{\text{ML}}$)**:
+   - Vector hóa tiêu đề theo cụm 1–2 âm tiết (`ngram_range=(1, 2)`) và dự báo phân phối xác suất qua `LogisticRegression.predict_proba()`:
+   $$\text{Score}_{\text{ML}}(h) = P(y = +1 \mid h) - P(y = -1 \mid h)$$
+3. **Điểm cảm xúc tổng hợp (Blended Ensemble Score)**:
+   $$\text{Sentiment Score}(h) = \text{clip}\left( 0.65 \times \text{Score}_{\text{lex}}(h) + 0.35 \times \text{Score}_{\text{ML}}(h), \; -1.0, \; +1.0 \right)$$
 
 ---
 
