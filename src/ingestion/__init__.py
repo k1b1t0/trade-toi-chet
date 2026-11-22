@@ -1,5 +1,5 @@
 """
-package src.ingestion (ong A): thu thap du lieu gia ohlcv, vi mo va cao tin tuc cafef.
+package src.ingestion: thu thap du lieu gia ohlcv, vi mo va cao tin tuc cafef.
 cung cap 2 ham entrypoint chuan hop dong: run_ingestion() va run_news_crawler().
 """
 

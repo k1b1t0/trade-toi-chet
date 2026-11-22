@@ -1,6 +1,6 @@
 """
 cau hinh hang so dung chung cho toan bo he thong tradetoichet.
-moi thanh vien (A, B, C, D, E) import truc tiep tu file nay.
+cac sub-package trong he thong import truc tiep tu file nay.
 """
 
 from pathlib import Path

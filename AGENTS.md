@@ -26,6 +26,7 @@ Mỗi thành viên chỉ làm việc trong **đúng sub-package của mình** b�
 2. **Quy Tắc Ngôn Ngữ Trong Code**:
    - **Tên hàm, tên biến, tên file, log messages (`print`/`logging`)**: Tiếng Anh ngắn gọn, chuẩn `snake_case`.
    - **Comment giải thích trong code (`# ...`) và Docstring**: Viết bằng **tiếng Việt không dấu**, ngắn gọn, giải thích rõ ý nghĩa nghiệp vụ/kỹ thuật (ví dụ: `# kiem tra sqlite cache truoc khi goi request de tranh bi ban ip`).
+   - **Cấm dùng tên placeholder cá nhân trong Code & Notebook**: Các nhãn `Người A/B/C/D/E`, `Ông A`, `Member A` chỉ dùng trong `docs/checklists/` để phân chia công việc. Trong toàn bộ mã nguồn `src/`, `tests/` và `notebooks/`, tuyệt đối chỉ dùng tên phân hệ kỹ thuật (`ingestion`, `processing`, `modeling`, `backtesting`, `dashboard`).
 3. **Chống Rò Rỉ Dữ Liệu Tương Lai (Zero Look-Ahead Bias)**:
    - Tuyệt đối không dùng `shuffle=True` hoặc `bfill()` trên dữ liệu chuỗi thời gian.
    - Chỉ được `.fit()` bộ `Imputer`/`Scaler` trên tập `train`, sau đó `.transform()` trên `validation` và `test`.
