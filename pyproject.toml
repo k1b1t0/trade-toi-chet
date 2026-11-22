@@ -1,0 +1,23 @@
+[project]
+name = "tradetoichet"
+version = "0.1.0"
+description = "End-to-End Multi-Source Financial Data Pipeline, Return Prediction, and T+2.5 Quantitative Trading Simulation for VN30"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "ipykernel>=6.29.5",
+    "jupyter>=1.1.1",
+    "lightgbm>=4.5.0",
+    "matplotlib>=3.9.2",
+    "nbconvert>=7.16.4",
+    "networkx>=3.3",
+    "numpy>=1.26.4",
+    "pandas>=2.2.2",
+    "plotly>=5.24.0",
+    "pyarrow>=17.0.0",
+    "requests>=2.32.3",
+    "scikit-learn>=1.5.1",
+    "seaborn>=0.13.2",
+    "streamlit>=1.38.0",
+]

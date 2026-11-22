@@ -1,0 +1,19 @@
+# Virtual environment & Python cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# OS & Editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Model weights & temporary caches
+models/*.pkl
+*.tmp
+*.log
