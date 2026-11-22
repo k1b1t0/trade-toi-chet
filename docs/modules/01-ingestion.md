@@ -96,15 +96,16 @@ Thay vì viết tay từ điển cứng (hardcoded regex/keywords) hay phải ch
 1. **Bước 1 — LLM Batch Annotation (Offline Distillation)**:
    - Toàn bộ **2,526 tiêu đề tin tức độc nhất** cào thực tế từ CafeF trong bảng `raw_news` được chia thành 10 batches (~253 câu/batch) và gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` bằng 10 AI Subagents (`Gemini Flash Lite`).
    - Kết quả phân phối nhãn thực tế lưu trong bảng `sentiment_labels` của `data/tradetoichet.db`:
-     - Nhãn `0` (Tin hành chính/thông báo định kỳ): `1,702` tiêu đề (`67.4%`)
-     - Nhãn `+1` (Tin tăng trưởng lợi nhuận/cổ tức/tích cực): `752` tiêu đề (`29.8%`)
-     - Nhãn `-1` (Tin sụt giảm/xử phạt/tiêu cực): `72` tiêu đề (`2.8%`)
+     - Nhãn `0` (Tin hành chính/thông báo định kỳ): `1,679` tiêu đề (`66.5%`)
+     - Nhãn `+1` (Tin tăng trưởng lợi nhuận/cổ tức/tích cực): `748` tiêu đề (`29.6%`)
+     - Nhãn `-1` (Tin sụt giảm/xử phạt/tiêu cực): `99` tiêu đề (`3.9%`)
 2. **Bước 2 — Huấn luyện & Đánh giá Hold-out 80/20**:
-   - Sử dụng `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=2, max_features=15000)` kết hợp `LogisticRegression(C=2.5, class_weight="balanced", random_state=42)`.
+   - Sử dụng `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=1, max_features=25000)` kết hợp `LogisticRegression(C=5.0, class_weight="balanced", random_state=42)`.
    - Kết quả kiểm định trên 20% tập Test độc lập (`506` tiêu đề):
-     - **Accuracy**: **`81.82%`**
-     - **Weighted F1-Score**: **`0.8212`** (Class `0` F1 = `0.8842`, Class `+1` F1 = `0.7296`).
-   - Mô hình sau đó được fit trên 100% tập nhãn và đóng gói ra file **`data/models/sentiment_tfidf.joblib`** (`593 KB`).
+     - **Accuracy**: **`88.14%`**
+     - **Macro F1-Score**: **`0.7869`**
+     - **Weighted F1-Score**: **`0.8836`** (Class `0` F1 = `0.9193`, Class `+1` F1 = `0.8415`, Class `-1` F1 = `0.6000`).
+   - Mô hình sau đó được fit trên 100% tập nhãn và đóng gói ra file **`data/models/sentiment_tfidf.joblib`**.
 3. **Bước 3 — Suy luận Runtime Siêu tốc (`< 0.1 ms/câu`)**:
    - Hàm `score_vietnamese_headline()` và `score_headlines_batch()` load trực tiếp file `.joblib` qua bộ nhớ đệm `@lru_cache` và tính điểm liên tục:
      $$\text{Sentiment Score}(h) = P(y = +1 \mid h) - P(y = -1 \mid h) \in [-1.0, +1.0]$$

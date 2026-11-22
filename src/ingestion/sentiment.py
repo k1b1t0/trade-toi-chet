@@ -18,7 +18,7 @@ from src.ingestion.db import get_connection
 
 
 def build_sentiment_pipeline() -> Pipeline:
-    """tao pipeline tfidf (1-3 ngrams, sublinear_tf) + logistic regression can bang trong so lop."""
+    """tao pipeline tfidf (1-3 ngrams, sublinear_tf, min_df=1) + logistic regression can bang trong so lop."""
     return Pipeline(
         [
             (
@@ -26,15 +26,15 @@ def build_sentiment_pipeline() -> Pipeline:
                 TfidfVectorizer(
                     ngram_range=(1, 3),
                     sublinear_tf=True,
-                    min_df=2,
-                    max_features=15000,
+                    min_df=1,
+                    max_features=25000,
                     lowercase=True,
                 ),
             ),
             (
                 "clf",
                 LogisticRegression(
-                    C=2.5,
+                    C=5.0,
                     class_weight="balanced",
                     max_iter=1000,
                     random_state=RANDOM_SEED,
