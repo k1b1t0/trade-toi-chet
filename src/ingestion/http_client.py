@@ -6,6 +6,7 @@ xoay vong user-agent, them do tre ngau nhien (jitter delay) va retry exponential
 import random
 import time
 from typing import Any
+
 import requests
 
 # danh sach user-agent trinh duyet pho bien de xoay vong ngau nhien
@@ -57,10 +58,14 @@ def fetch_url(
                 return resp.text
             # neu bi gioi han toc do (429) hoac loi server (5xx) thi doi lau hon
             wait_sec = (2**attempt) + random.uniform(0.2, 0.8)
-            print(f"[WARN] HTTP {resp.status_code} on {url}, retry {attempt}/{max_retries} in {wait_sec:.1f}s")
+            print(
+                f"[WARN] HTTP {resp.status_code} on {url}, retry {attempt}/{max_retries} in {wait_sec:.1f}s"
+            )
             time.sleep(wait_sec)
         except requests.RequestException as exc:
             wait_sec = (2**attempt) + random.uniform(0.2, 0.8)
-            print(f"[WARN] Request error ({exc}), retry {attempt}/{max_retries} in {wait_sec:.1f}s")
+            print(
+                f"[WARN] Request error ({exc}), retry {attempt}/{max_retries} in {wait_sec:.1f}s"
+            )
             time.sleep(wait_sec)
     raise RuntimeError(f"Failed to fetch URL after {max_retries} attempts: {url}")

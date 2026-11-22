@@ -7,7 +7,12 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 import pandas as pd
 from src.config import DATA_RAW_DIR, END_DATE, SQLITE_DB_PATH, START_DATE, VN30_TICKERS
-from src.ingestion.db import get_connection, has_ticker_news, init_db, insert_news_records
+from src.ingestion.db import (
+    get_connection,
+    has_ticker_news,
+    init_db,
+    insert_news_records,
+)
 from src.ingestion.http_client import fetch_url
 from src.ingestion.sentiment import score_vietnamese_headline
 
@@ -86,10 +91,16 @@ def sync_all_news(
     init_db(db_path)
     for idx, ticker in enumerate(tickers, start=1):
         if has_ticker_news(ticker, min_rows=15, db_path=db_path):
-            print(f"[{idx:02d}/{len(tickers)}] Cache hit in SQLite for {ticker} news, skipping crawl.")
+            print(
+                f"[{idx:02d}/{len(tickers)}] Cache hit in SQLite for {ticker} news, skipping crawl."
+            )
             continue
-        print(f"[{idx:02d}/{len(tickers)}] Crawling CafeF news for {ticker} (up to {max_pages_per_ticker} pages)...")
-        count = crawl_ticker_news(ticker, max_pages=max_pages_per_ticker, db_path=db_path)
+        print(
+            f"[{idx:02d}/{len(tickers)}] Crawling CafeF news for {ticker} (up to {max_pages_per_ticker} pages)..."
+        )
+        count = crawl_ticker_news(
+            ticker, max_pages=max_pages_per_ticker, db_path=db_path
+        )
         print(f"    -> Parsed {count} articles for {ticker}")
 
     # doc toan bo tin tuc tu sqlite va gom nhom theo (date, ticker)
@@ -100,12 +111,22 @@ def sync_all_news(
         )
 
     if df_raw.empty:
-        df_agg = pd.DataFrame(columns=["date", "ticker", "news_count", "sentiment_score", "sample_headline"])
+        df_agg = pd.DataFrame(
+            columns=[
+                "date",
+                "ticker",
+                "news_count",
+                "sentiment_score",
+                "sample_headline",
+            ]
+        )
     else:
         # neu ngay dang tin roi vao thu 7 / chu nhat thi quy ve thu 2 ke tiep de khop ngay giao dich
         dt_series = pd.to_datetime(df_raw["date"])
         weekday = dt_series.dt.weekday
-        dt_series = dt_series + pd.to_timedelta((weekday == 5) * 2 + (weekday == 6) * 1, unit="D")
+        dt_series = dt_series + pd.to_timedelta(
+            (weekday == 5) * 2 + (weekday == 6) * 1, unit="D"
+        )
         df_raw["date"] = dt_series.dt.normalize()
 
         # loc trong pham vi start_date -> end_date (hoac giu toan bo tin da cao)
@@ -125,5 +146,7 @@ def sync_all_news(
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / "news_sentiment.parquet"
     df_agg.to_parquet(out_path, index=False)
-    print(f"[OK] Saved {len(df_agg):,} daily ticker-news rows (from {len(df_raw):,} articles) to {out_path}")
+    print(
+        f"[OK] Saved {len(df_agg):,} daily ticker-news rows (from {len(df_raw):,} articles) to {out_path}"
+    )
     return df_agg
