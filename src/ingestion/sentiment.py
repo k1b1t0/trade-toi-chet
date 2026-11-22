@@ -1,89 +1,116 @@
 """
-mo hinh phan tich cam xuc tin tuc tai chinh tieng viet (hybrid tf-idf + logistic regression & lexicon).
-ket hop tu dien chuyen nganh chung khoan va mo hinh hoc may scikit-learn chay sieu nhanh tren cpu.
+huan luyen va suy luan cam xuc tin tuc tai chinh tieng viet (llm distillation -> tfidf + logistic regression).
+khong chua bat ky tu khoa hay cau mau gan cung nao; doc nhan llm tu sqlite va luu model ra .joblib.
 """
 
 from functools import lru_cache
+from pathlib import Path
+import joblib
+import numpy as np
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, f1_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-
-# tu khoa tich cuc va tieu cuc trong tin tuc chung khoan viet nam
-POSITIVE_KEYWORDS: tuple[str, ...] = (
-    " tăng ", "tang truong", "tăng trưởng", "kỷ lục", "ky luc", "đột biến", "dot bien",
-    "lãi lớn", "lai lon", "lãi ròng", "lợi nhuận tăng", "vượt kế hoạch", "vuot ke hoach",
-    "cổ tức", "co tuc", "chia thưởng", "mua vào", "mua ròng", "gom hàng", "tích cực",
-    "bứt phá", "but pha", "khởi sắc", "khoi sac", "đỉnh mới", "vượt đỉnh", "hồi phục",
-    "phục hồi", "thắng lớn", "tăng trần", "tím lịm", "hưởng lợi", "triển vọng",
-    "ký kết", "hợp đồng lớn", "mở rộng", "đầu tư mới", "nâng hạng", "khả quan",
-)
-
-NEGATIVE_KEYWORDS: tuple[str, ...] = (
-    " giảm ", "sụt giảm", "sut giam", "thua lỗ", "báo lỗ", "lỗ nặng", "lỗ ròng",
-    "lao dốc", "lao doc", "bốc hơi", "boc hoi", "xả hàng", "xa hang", "bán tháo",
-    "bán ròng", "ban rong", "bị phạt", "xử phạt", "vi phạm", "nợ xấu", "no xau",
-    "phá sản", "đình chỉ", "hủy niêm yết", "cảnh báo", "kiểm soát", "bi quan",
-    "thấp nhất", "đáy mới", "thủng đáy", "giảm sàn", "lau sàn", "rủi ro",
-    "khó khăn", "đình trệ", "suy thoái", "thanh tra", "khởi tố", "bắt tạm giam",
-)
-
-# tap du lieu hat giong (seed corpus) de huan luyen pipeline tf-idf + logistic regression
-SEED_CORPUS: tuple[tuple[str, int], ...] = (
-    ("lợi nhuận sau thuế tăng trưởng kỷ lục vượt kế hoạch năm", 1),
-    ("doanh thu bứt phá mạnh chia cổ tức tiền mặt tỷ lệ cao", 1),
-    ("khối ngoại mua ròng mạnh cổ phiếu tăng trần khởi sắc", 1),
-    ("ký kết hợp đồng lớn mở rộng đầu tư triển vọng khả quan", 1),
-    ("cổ phiếu hồi phục vượt đỉnh mới nhờ kết quả kinh doanh tích cực", 1),
-    ("lãi lớn quý này nhờ biên lợi nhuận cải thiện đột biến", 1),
-    ("doanh nghiệp báo lỗ nặng lợi nhuận sụt giảm lao dốc", -1),
-    ("cổ phiếu bị bán tháo xả hàng bốc hơi vốn hóa giảm sàn", -1),
-    ("bị xử phạt vi phạm hành chính cảnh báo rủi ro nợ xấu tăng", -1),
-    ("khối ngoại bán ròng liên tiếp thủng đáy mới đầy khó khăn", -1),
-    ("đình chỉ giao dịch kiểm soát đặc biệt do thua lỗ kéo dài", -1),
-    ("thanh tra khởi tố vi phạm công bố thông tin suy thoái", -1),
-    ("thông báo lịch họp đại hội đồng cổ đông thường niên năm nay", 0),
-    ("nghị quyết hội đồng quản trị về việc thay đổi địa chỉ trụ sở", 0),
-    ("báo cáo tình hình quản trị công ty 6 tháng đầu năm", 0),
-    ("thông báo ngày đăng ký cuối cùng để thực hiện quyền tham dự họp", 0),
-)
+from src.config import RANDOM_SEED, SENTIMENT_MODEL_PATH, SQLITE_DB_PATH
+from src.ingestion.db import get_connection
 
 
-@lru_cache(maxsize=1)
-def get_tfidf_sentiment_model() -> Pipeline:
-    """khoi tao va huan luyen pipeline tf-idf (1-2 ngrams) + logistic regression tren seed corpus."""
-    texts = [item[0] for item in SEED_CORPUS]
-    labels = [item[1] for item in SEED_CORPUS]
-    model = Pipeline(
+def build_sentiment_pipeline() -> Pipeline:
+    """tao pipeline tfidf (1-3 ngrams, sublinear_tf) + logistic regression can bang trong so lop."""
+    return Pipeline(
         [
-            ("tfidf", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
-            ("clf", LogisticRegression(C=2.0, random_state=42)),
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    ngram_range=(1, 3),
+                    sublinear_tf=True,
+                    min_df=2,
+                    max_features=15000,
+                    lowercase=True,
+                ),
+            ),
+            (
+                "clf",
+                LogisticRegression(
+                    C=2.5,
+                    class_weight="balanced",
+                    max_iter=1000,
+                    random_state=RANDOM_SEED,
+                ),
+            ),
         ]
     )
-    model.fit(texts, labels)
-    return model
 
 
-def score_vietnamese_headline(headline: str) -> float:
+def train_and_save_sentiment_model(
+    db_path: Path = SQLITE_DB_PATH,
+    model_path: Path = SENTIMENT_MODEL_PATH,
+) -> dict[str, float]:
     """
-    tinh diem cam xuc [-1.0, 1.0] ket hop (ensemble):
-    60% tu diem tu dien chuyen nganh + 40% tu xac suat mo hinh tf-idf logistic regression.
+    doc bang sentiment_labels do llm gan nhan trong sqlite, danh gia 80/20 train/test,
+    sau do fit tren toan bo tap nhan va luu model ra file .joblib.
     """
-    if not headline or not isinstance(headline, str):
-        return 0.0
+    with get_connection(db_path) as conn:
+        df = pd.read_sql_query("SELECT headline, llm_label FROM sentiment_labels", conn)
 
-    text = f" {headline.lower().strip()} "
-    pos_hits = sum(1 for kw in POSITIVE_KEYWORDS if kw in text)
-    neg_hits = sum(1 for kw in NEGATIVE_KEYWORDS if kw in text)
-    if pos_hits == 0 and neg_hits == 0:
-        return 0.0
+    if len(df) < 50:
+        raise ValueError(f"Insufficient distilled labels in sentiment_labels table ({len(df)} rows).")
 
-    lex_score = (pos_hits - neg_hits) / float(pos_hits + neg_hits + 0.5)
-    model = get_tfidf_sentiment_model()
-    probs = model.predict_proba([text])[0]
+    X = df["headline"].astype(str).to_numpy(dtype=object)
+    y = df["llm_label"].astype(int).to_numpy(dtype=int)
+
+    # danh gia tren tap hold-out 80/20 co phan tang (stratified split)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=RANDOM_SEED, stratify=y
+    )
+    eval_pipe = build_sentiment_pipeline()
+    eval_pipe.fit(X_train, y_train)
+    y_pred = eval_pipe.predict(X_test)
+
+    acc = float(accuracy_score(y_test, y_pred))
+    macro_f1 = float(f1_score(y_test, y_pred, average="macro"))
+    weighted_f1 = float(f1_score(y_test, y_pred, average="weighted"))
+    print(f"[SENTIMENT] 80/20 Hold-out Evaluation on {len(X_test)} headlines:")
+    print(f"    Accuracy: {acc:.4f} | Macro-F1: {macro_f1:.4f} | Weighted-F1: {weighted_f1:.4f}")
+    print(classification_report(y_test, y_pred, digits=4))
+
+    # fit tren 100% du lieu da gan nhan va xuat ra file .joblib
+    final_pipe = build_sentiment_pipeline()
+    final_pipe.fit(X, y)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(final_pipe, model_path)
+    load_sentiment_model.cache_clear()
+    print(f"[OK] Saved distilled TF-IDF sentiment model to {model_path}")
+    return {"accuracy": acc, "macro_f1": macro_f1, "weighted_f1": weighted_f1, "total_samples": float(len(df))}
+
+
+@lru_cache(maxsize=2)
+def load_sentiment_model(model_path: Path = SENTIMENT_MODEL_PATH) -> Pipeline:
+    """load model .joblib tu o dia va luu vao bo nho cache de suy luan < 0.1ms/cau."""
+    if not model_path.exists():
+        train_and_save_sentiment_model(model_path=model_path)
+    return joblib.load(model_path)
+
+
+def score_headlines_batch(headlines: list[str], model_path: Path = SENTIMENT_MODEL_PATH) -> np.ndarray:
+    """cham diem cam xuc hang loat P(y=+1) - P(y=-1) trong doan [-1.0, 1.0]."""
+    if not headlines:
+        return np.array([], dtype="float64")
+    model = load_sentiment_model(model_path)
+    probs = model.predict_proba(headlines)
     classes = list(model.classes_)
-    p_pos = probs[classes.index(1)] if 1 in classes else 0.0
-    p_neg = probs[classes.index(-1)] if -1 in classes else 0.0
-    ml_score = float(p_pos - p_neg)
+    pos_idx = classes.index(1) if 1 in classes else -1
+    neg_idx = classes.index(-1) if -1 in classes else -1
+    p_pos = probs[:, pos_idx] if pos_idx >= 0 else np.zeros(len(headlines))
+    p_neg = probs[:, neg_idx] if neg_idx >= 0 else np.zeros(len(headlines))
+    scores = np.clip(p_pos - p_neg, -1.0, 1.0)
+    return np.round(scores, 4)
 
-    blended = 0.65 * lex_score + 0.35 * ml_score
-    return round(max(-1.0, min(1.0, blended)), 4)
+
+def score_vietnamese_headline(headline: str, model_path: Path = SENTIMENT_MODEL_PATH) -> float:
+    """tinh diem cam xuc [-1.0, 1.0] cho 1 tieu de tin tuc bang model .joblib da train."""
+    if not headline or not isinstance(headline, str) or not headline.strip():
+        return 0.0
+    return float(score_headlines_batch([headline.strip()], model_path=model_path)[0])

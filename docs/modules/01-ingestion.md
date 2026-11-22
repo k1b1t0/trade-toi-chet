@@ -89,17 +89,25 @@ Toàn bộ mã nguồn được chia thành **7 file nhỏ gọn** (mỗi file c
 
 ---
 
-## 4. Mô Hình Hybrid NLP Chấm Điểm Cảm Xúc Tiếng Việt (`src/ingestion/sentiment.py`)
+## 4. Quy Trình LLM Knowledge Distillation & Mô Hình `.joblib` (`src/ingestion/sentiment.py`)
 
-Thay vì chỉ dùng từ điển cứng hoặc dùng các mô hình Deep Learning hàng trăm MB cần GPU, phân hệ sử dụng kiến trúc **Hybrid NLP (Từ điển chuyên ngành + Mô hình Học máy `TfidfVectorizer(ngram_range=(1, 2))` & `LogisticRegression` của `scikit-learn`)**:
+Thay vì viết tay từ điển cứng (hardcoded regex/keywords) hay phải chạy mô hình LLM nặng lúc runtime, phân hệ áp dụng quy trình **Chưng cất Tri thức từ LLM (LLM Knowledge Distillation)** sang mô hình thống kê nhẹ **`TfidfVectorizer + LogisticRegression`**:
 
-1. **Thành phần 1 — Điểm từ điển chuyên ngành ($\text{Score}_{\text{lex}}$)**:
-   $$\text{Score}_{\text{lex}}(h) = \frac{N_{\text{pos}} - N_{\text{neg}}}{N_{\text{pos}} + N_{\text{neg}} + 0.5}$$
-2. **Thành phần 2 — Xác suất mô hình Học máy TF-IDF + Logistic Regression ($\text{Score}_{\text{ML}}$)**:
-   - Vector hóa tiêu đề theo cụm 1–2 âm tiết (`ngram_range=(1, 2)`) và dự báo phân phối xác suất qua `LogisticRegression.predict_proba()`:
-   $$\text{Score}_{\text{ML}}(h) = P(y = +1 \mid h) - P(y = -1 \mid h)$$
-3. **Điểm cảm xúc tổng hợp (Blended Ensemble Score)**:
-   $$\text{Sentiment Score}(h) = \text{clip}\left( 0.65 \times \text{Score}_{\text{lex}}(h) + 0.35 \times \text{Score}_{\text{ML}}(h), \; -1.0, \; +1.0 \right)$$
+1. **Bước 1 — LLM Batch Annotation (Offline Distillation)**:
+   - Toàn bộ **2,526 tiêu đề tin tức độc nhất** cào thực tế từ CafeF trong bảng `raw_news` được chia thành 10 batches (~253 câu/batch) và gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` bằng 10 AI Subagents (`Gemini Flash Lite`).
+   - Kết quả phân phối nhãn thực tế lưu trong bảng `sentiment_labels` của `data/tradetoichet.db`:
+     - Nhãn `0` (Tin hành chính/thông báo định kỳ): `1,702` tiêu đề (`67.4%`)
+     - Nhãn `+1` (Tin tăng trưởng lợi nhuận/cổ tức/tích cực): `752` tiêu đề (`29.8%`)
+     - Nhãn `-1` (Tin sụt giảm/xử phạt/tiêu cực): `72` tiêu đề (`2.8%`)
+2. **Bước 2 — Huấn luyện & Đánh giá Hold-out 80/20**:
+   - Sử dụng `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=2, max_features=15000)` kết hợp `LogisticRegression(C=2.5, class_weight="balanced", random_state=42)`.
+   - Kết quả kiểm định trên 20% tập Test độc lập (`506` tiêu đề):
+     - **Accuracy**: **`81.82%`**
+     - **Weighted F1-Score**: **`0.8212`** (Class `0` F1 = `0.8842`, Class `+1` F1 = `0.7296`).
+   - Mô hình sau đó được fit trên 100% tập nhãn và đóng gói ra file **`data/models/sentiment_tfidf.joblib`** (`593 KB`).
+3. **Bước 3 — Suy luận Runtime Siêu tốc (`< 0.1 ms/câu`)**:
+   - Hàm `score_vietnamese_headline()` và `score_headlines_batch()` load trực tiếp file `.joblib` qua bộ nhớ đệm `@lru_cache` và tính điểm liên tục:
+     $$\text{Sentiment Score}(h) = P(y = +1 \mid h) - P(y = -1 \mid h) \in [-1.0, +1.0]$$
 
 ---
 

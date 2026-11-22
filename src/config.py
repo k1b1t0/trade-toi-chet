@@ -10,6 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
+DATA_MODELS_DIR = DATA_DIR / "models"
+SENTIMENT_MODEL_PATH = DATA_MODELS_DIR / "sentiment_tfidf.joblib"
 SQLITE_DB_PATH = DATA_DIR / "tradetoichet.db"
 
 # danh sach 30 ma co phieu trong ro vn30 va chi so vnindex

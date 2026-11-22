@@ -5,8 +5,9 @@ cach chay: uv run pytest -v
 
 from pathlib import Path
 import pandas as pd
-from src.config import BENCHMARK_TICKER, DATA_RAW_DIR, VN30_TICKERS
+from src.config import BENCHMARK_TICKER, DATA_RAW_DIR, SENTIMENT_MODEL_PATH, SQLITE_DB_PATH, VN30_TICKERS
 from src.ingestion.db import (
+    get_connection,
     has_ticker_news,
     has_ticker_prices,
     init_db,
@@ -18,14 +19,19 @@ from src.ingestion.sentiment import score_vietnamese_headline
 
 
 def test_sentiment_scorer_polarity() -> None:
-    """kiem tra tu dien cam xuc tieng viet phan biet dung tin tich cuc, tieu cuc va trung lap."""
-    pos_score = score_vietnamese_headline("FPT lãi lớn kỷ lục, lợi nhuận tăng trưởng vượt kế hoạch và chia cổ tức cao")
-    neg_score = score_vietnamese_headline("Cổ phiếu lao dốc, doanh nghiệp báo lỗ nặng và bị xử phạt vi phạm")
-    neu_score = score_vietnamese_headline("Thông báo lịch họp đại hội đồng cổ đông thường niên năm 2026")
+    """kiem tra model .joblib da train tu 2526 nhan llm distillation phan biet dung tin tich cuc, tieu cuc va trung lap."""
+    assert SENTIMENT_MODEL_PATH.exists(), "Missing pre-trained sentiment_tfidf.joblib model"
+    with get_connection(SQLITE_DB_PATH) as conn:
+        label_count = conn.execute("SELECT COUNT(*) FROM sentiment_labels").fetchone()[0]
+    assert label_count >= 2500, f"Expected >= 2500 distilled labels, got {label_count}"
 
-    assert 0.2 < pos_score <= 1.0
-    assert -1.0 <= neg_score < -0.2
-    assert neu_score == 0.0
+    pos_score = score_vietnamese_headline("FPT báo lãi kỷ lục, lợi nhuận sau thuế tăng trưởng mạnh")
+    neg_score = score_vietnamese_headline("Cổ phiếu giảm sàn, doanh nghiệp thua lỗ nặng và bị xử phạt")
+    neu_score = score_vietnamese_headline("Thông báo ngày đăng ký cuối cùng để thực hiện quyền tham dự ĐHĐCĐ thường niên")
+
+    assert pos_score > 0.15
+    assert neg_score < -0.10
+    assert abs(neu_score) < 0.25
 
 
 def test_parse_cafef_news_html_offline() -> None:

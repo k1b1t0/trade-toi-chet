@@ -56,6 +56,14 @@ def init_db(db_path: Path = SQLITE_DB_PATH) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sentiment_labels (
+                headline TEXT PRIMARY KEY,
+                llm_label INTEGER NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
