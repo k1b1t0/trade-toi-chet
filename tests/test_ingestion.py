@@ -123,6 +123,11 @@ def test_raw_parquet_data_contracts() -> None:
     m_cols = ["date", "vnindex_close", "vnindex_return_1d", "vnindex_volatility_20d", "usd_vnd_rate", "sbv_policy_rate"]
     assert list(df_m.columns) == m_cols
     assert pd.api.types.is_datetime64_any_dtype(df_m["date"])
-    assert df_m.isna().sum().sum() == 0
+    # 19 ngay dau tien de NaN tu nhien cho rolling(20) de chong look-ahead bias (khong dung bfill)
+    assert df_m["vnindex_volatility_20d"].iloc[:19].isna().all()
+    assert df_m["vnindex_volatility_20d"].iloc[19:].isna().sum() == 0
+    # cac cot khac khong duoc chua NaN
+    other_cols = ["date", "vnindex_close", "vnindex_return_1d", "usd_vnd_rate", "sbv_policy_rate"]
+    assert df_m[other_cols].isna().sum().sum() == 0
     assert df_m.duplicated(subset=["date"]).sum() == 0
     assert len(df_m) > 1500

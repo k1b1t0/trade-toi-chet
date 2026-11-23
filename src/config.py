@@ -16,31 +16,77 @@ SQLITE_DB_PATH = DATA_DIR / "tradetoichet.db"
 
 # danh sach 30 ma co phieu trong ro vn30 va chi so vnindex
 VN30_TICKERS: list[str] = [
-    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
-    "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
-    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+    "ACB",
+    "BCM",
+    "BID",
+    "BVH",
+    "CTG",
+    "FPT",
+    "GAS",
+    "GVR",
+    "HDB",
+    "HPG",
+    "MBB",
+    "MSN",
+    "MWG",
+    "PLX",
+    "POW",
+    "SAB",
+    "SHB",
+    "SSB",
+    "SSI",
+    "STB",
+    "TCB",
+    "TPB",
+    "VCB",
+    "VHM",
+    "VIB",
+    "VIC",
+    "VJC",
+    "VNM",
+    "VPB",
+    "VRE",
 ]
 BENCHMARK_TICKER: str = "VNINDEX"
 
 # phan nhom nganh cho 30 ma vn30 va chi so thi truong
 SECTOR_MAP: dict[str, str] = {
-    "ACB": "Banking", "BID": "Banking", "CTG": "Banking", "HDB": "Banking",
-    "MBB": "Banking", "SHB": "Banking", "SSB": "Banking", "STB": "Banking",
-    "TCB": "Banking", "TPB": "Banking", "VCB": "Banking", "VIB": "Banking",
+    "ACB": "Banking",
+    "BID": "Banking",
+    "CTG": "Banking",
+    "HDB": "Banking",
+    "MBB": "Banking",
+    "SHB": "Banking",
+    "SSB": "Banking",
+    "STB": "Banking",
+    "TCB": "Banking",
+    "TPB": "Banking",
+    "VCB": "Banking",
+    "VIB": "Banking",
     "VPB": "Banking",
-    "BCM": "RealEstate", "VHM": "RealEstate", "VIC": "RealEstate", "VRE": "RealEstate",
-    "MSN": "Consumer", "MWG": "Consumer", "SAB": "Consumer", "VNM": "Consumer",
-    "GAS": "Energy", "PLX": "Energy", "POW": "Energy",
-    "BVH": "Financials", "SSI": "Financials",
+    "BCM": "RealEstate",
+    "VHM": "RealEstate",
+    "VIC": "RealEstate",
+    "VRE": "RealEstate",
+    "MSN": "Consumer",
+    "MWG": "Consumer",
+    "SAB": "Consumer",
+    "VNM": "Consumer",
+    "GAS": "Energy",
+    "PLX": "Energy",
+    "POW": "Energy",
+    "BVH": "Financials",
+    "SSI": "Financials",
     "FPT": "Technology",
     "HPG": "Steel",
-    "GVR": "Industrial", "VJC": "Industrial",
+    "GVR": "Industrial",
+    "VJC": "Industrial",
     "VNINDEX": "Index",
 }
 
 # khoang thoi gian lay du lieu va moc chia temporal split (chong look-ahead bias)
 START_DATE: str = "2019-01-01"
-END_DATE: str = "2026-03-01"
+END_DATE: str = "2026-11-20"
 TRAIN_END_DATE: str = "2023-12-31"
 VAL_END_DATE: str = "2024-12-31"
 
