@@ -1,7 +1,6 @@
 # TradeToiChet — Hệ Thống Dự Báo Lợi Nhuận & Mô Phỏng Giao Dịch Định Lượng VN30
 
-> **Đồ án Khoa học Dữ liệu (IT4930) · Học máy (IT3190) · SMA Zoomcamp Capstone**
-> Hệ thống thu thập dữ liệu đa nguồn (API giá OHLCV + Web Crawling tin tức CafeF + Vĩ mô SBV), phân tích mạng lưới liên kết PageRank, học máy đối sánh 2 bài báo khoa học SOTA (Nature 2024 & PLOS ONE 2025) và mô phỏng chiến lược giao dịch T+2.5 trên rổ cổ phiếu VN30.
+[![CI Pipeline](https://github.com/k1b1t0/TradeToiChet/actions/workflows/ci.yml/badge.svg)](https://github.com/k1b1t0/TradeToiChet/actions/workflows/ci.yml)
 
 ---
 
