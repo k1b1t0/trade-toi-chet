@@ -1,0 +1,46 @@
+name: TradeToiChet CI Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install Dependencies
+        run: uv sync
+
+      - name: Check Python Syntax & Compilation
+        run: uv run python -m compileall src/ tests/
+
+      - name: Run Pytest Suite
+        run: uv run pytest tests/ -v --durations=10
+
+      - name: Verify Raw Parquet Datasets
+        run: |
+          uv run python -c "
+          import pandas as pd
+          p = pd.read_parquet('data/raw/prices.parquet')
+          n = pd.read_parquet('data/raw/news_sentiment.parquet')
+          m = pd.read_parquet('data/raw/macro.parquet')
+          assert len(p) > 50000, 'prices.parquet missing data'
+          assert len(n) > 1000, 'news_sentiment.parquet missing data'
+          assert len(m) > 1500, 'macro.parquet missing data'
+          print('[OK] All raw parquet files are fully valid!')
+          "
