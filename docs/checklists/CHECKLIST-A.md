@@ -8,40 +8,33 @@
 
 ## 1. Các File Bạn Sở Hữu (Chỉ mình bạn code vào các file này)
 
-1. `src/ingest.py` — Script kéo giá lịch sử OHLCV của 30 mã VN30, chỉ số VN-Index và dữ liệu vĩ mô.
-2. `src/crawler.py` — Web Scraper (`requests` + `BeautifulSoup4`) cào tiêu đề tin tức tài chính và chấm điểm cảm xúc (`sentiment_score`).
-3. `notebooks/01_data_crawling.ipynb` — Notebook trình bày trực quan quá trình thu thập dữ liệu, cấu trúc DOM HTML khi cào web và thống kê sơ bộ nguồn dữ liệu để đưa vào Chương 2 của Báo cáo PDF.
+1. `src/ingestion/` — Sub-package (`price_fetcher.py`, `macro_builder.py`, `news_crawler.py`, `sentiment.py`, `db.py`, `http_client.py`, `cli.py`).
+2. `tests/test_ingestion.py` — Unit tests & Data Contract tests.
+3. `notebooks/01_data_crawling.ipynb` & `docs/modules/01-ingestion.md` — Notebook trình bày trực quan và tài liệu kỹ thuật chi tiết.
 
 ---
 
 ## 2. Công Nghệ & Thư Viện Sử Dụng
 
-- **Kéo giá chứng khoán Việt Nam**: Thư viện `vnstock` (nguồn TCBS / VCI / SSI) hoặc API JSON công khai của CafeF / Entrade DNSE (rất nhẹ, không cần API key trả phí).
-- **Web Scraping tin tức**: `requests` + `beautifulsoup4` (cào các trang danh sách tin tức theo mã cổ phiếu trên CafeF hoặc Vietstock).
-- **Chấm điểm cảm xúc tiếng Việt (Siêu nhẹ, chạy CPU tức thì)**: Bộ từ điển từ khóa tài chính tiếng Việt (Vietnamese Financial Sentiment Lexicon: nhóm từ tích cực như *"lãi kỷ lục", "vượt kế hoạch", "tăng trưởng", "cổ tức cao", "mua ròng"* vs nhóm từ tiêu cực như *"thua lỗ", "sụt giảm", "bị phạt", "bán tháo", "nợ xấu"*) kết hợp trọng số TF-IDF đơn giản để tính điểm trong đoạn `[-1.0, 1.0]`.
-- **Lưu trữ**: `pandas` + `pyarrow` (`df.to_parquet(..., index=False)`).
+- **Kéo giá chứng khoán Việt Nam**: API JSON công khai của Entrade DNSE (`services.entrade.com.vn/chart-api/v2/ohlcs`) + tỷ giá USD/VND từ Yahoo Finance (`VND=X`).
+- **Web Scraping tin tức**: `requests` + `beautifulsoup4` cào tin doanh nghiệp CafeF (kèm `pub_time` `HH:mm`, dời tin `>= 14:45` & lễ/Tết sang phiên kế tiếp).
+- **Chấm điểm cảm xúc tiếng Việt**: LLM Knowledge Distillation (`4,917` nhãn lưu trong `data/raw/sentiment_labels.parquet`) → `TfidfVectorizer + LogisticRegression` train leak-free trên `<= 2023-12-31` (`sentiment_tfidf.joblib`).
+- **Lưu trữ**: `SQLite` (local cache trong `.gitignore`) + `Apache Parquet` (`datetime64[ns]`).
 
 ---
 
 ## 3. Lộ Trình Các Bước Thực Hiện Chi Tiết (Step-by-Step Checklist)
 
 ### Bước 1: Viết module thu thập dữ liệu giá và vĩ mô tạo `prices.parquet` và `macro.parquet`
-- [x] Đọc danh sách 30 mã `VN30_TICKERS`, `START_DATE = "2019-01-01"`, `END_DATE = "2026-03-01"` từ `src/config.py`.
-- [x] Viết vòng lặp tải lịch sử giá theo ngày (`open`, `high`, `low`, `close`, `volume`) cho từng mã trong 30 mã VN30 và chỉ số `VNINDEX`.
-- [x] Thêm cột `sector` (ánh xạ từ dictionary cố định chuẩn 30 mã VN30).
-- [x] Chuẩn hóa kiểu dữ liệu theo đúng [API_CONTRACTS.md](API_CONTRACTS.md):
-  - `date` ép về `pd.to_datetime(df['date']).dt.tz_localize(None)`.
-  - Sắp xếp theo `['ticker', 'date']`, xóa trùng lặp `drop_duplicates(subset=['date', 'ticker'])`.
-- [x] Lưu bảng giá ra `data/raw/prices.parquet`.
-- [x] Từ dữ liệu `VNINDEX` vừa tải, tính `vnindex_close`, `vnindex_return_1d`, `vnindex_volatility_20d`, ghép thêm cột tỷ giá `usd_vnd_rate` và lãi suất `sbv_policy_rate`, lưu ra `data/raw/macro.parquet`.
+- [x] Đọc danh sách 30 mã `VN30_TICKERS`, `START_DATE = "2019-01-01"`, `END_DATE = "2026-11-20"` từ `src/config.py`.
+- [x] Tải lịch sử giá OHLCV 30 mã VN30 và `VNINDEX` theo cơ chế incremental 2 đầu (`end_ts` `23:59:59 UTC`).
+- [x] Thêm cột `sector` và chuẩn hóa `date` thành `datetime64[ns]` theo đúng [API_CONTRACTS.md](../architecture/API_CONTRACTS.md).
+- [x] Lưu `data/raw/prices.parquet` (`60,385` dòng) và dựng `data/raw/macro.parquet` (`1,968` phiên reindex đủ lịch VN30 + `ffill`, tỷ giá Yahoo `VND=X`, lãi suất SBV).
 
 ### Bước 2: Viết module cào tin tức tạo `news_sentiment.parquet` (Trọng tâm Bài L2)
-- [x] Viết hàm cào danh sách tin tức CafeF (`requests` xoay User-Agent, jitter delay, retry exponential backoff).
-- [x] Dùng `BeautifulSoup(html, "html.parser")` bóc tách ngày đăng và tiêu đề bài báo.
-- [x] Viết cơ chế Fallback & Cache SQLite (`data/tradetoichet.db` bảng `raw_news`, `prices`, `macro`, `sentiment_labels`).
-- [x] Nâng cấp mô hình chấm điểm cảm xúc: Distillation 2.526 tiêu đề tiếng Việt qua LLM, train TF-IDF (1-3 ngrams) + LogisticRegression (88.1% Acc), đóng gói ra `.joblib`, suy luận xác suất P(+1) - P(-1).
-- [x] Gom nhóm theo `(date, ticker)` (`news_count`, `sentiment_score`, `sample_headline`).
-- [x] Lưu kết quả ra `data/raw/news_sentiment.parquet`.
+- [x] Cào tin tức CafeF (`requests` xoay User-Agent, jitter delay `0.25–0.55s`, retry exponential backoff) kèm `pub_time` (`HH:mm`), ưu tiên `get_text()`.
+- [x] Train mô hình cảm xúc leak-free (`<= 2023-12-31`, `2,022` mẫu train → `2,895` mẫu eval đạt `83.90%` Accuracy / `0.8443` Weighted-F1), đóng gói ra `data/models/sentiment_tfidf.joblib` và xuất `data/raw/sentiment_labels.parquet`.
+- [x] Dời tin `>= 14:45`, cuối tuần và lễ/Tết sang phiên giao dịch kế tiếp, gom nhóm theo `(date, ticker)` và lưu `data/raw/news_sentiment.parquet` (`18,160` dòng, `0` dòng lệch lịch phiên).
 
 ### Bước 3: Hoàn thiện `notebooks/01_data_crawling.ipynb`
 - [x] Trình bày sơ đồ kiến trúc Crawler (Request -> HTML DOM -> BeautifulSoup Parser -> Distilled Sentiment Model -> Parquet).

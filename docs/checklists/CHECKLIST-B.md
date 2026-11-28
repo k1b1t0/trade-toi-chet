@@ -56,8 +56,8 @@
   - `target_return_10d = groupby('ticker')['close'].shift(-10) / close - 1`.
   - `target_class = (target_return_10d > 0.015).astype('int32')`.
   - `max_high_next_10d` và `min_low_next_10d`: Giá cao nhất / thấp nhất trong cửa sổ từ `t+3` đến `t+10` (sau khi cổ phiếu về tài khoản theo chu kỳ T+2.5).
-  - Gán cột `split`: `"train"` nếu `date <= "2023-12-31"`, `"validation"` nếu `"2024-01-01" <= date <= "2024-12-31"`, `"test"` nếu `date >= "2025-01-01"`.
-  - Loại bỏ các dòng đầu/cuối bị `NaN` do cửa sổ trượt, lưu ra `data/processed/features_all.parquet`.
+  - Gán cột `split`: `"train"` nếu `date <= "2023-12-31"`, `"validation"` nếu `"2024-01-01" <= date <= "2024-12-31"`, `"test"` nếu `date >= "2025-01-01"` và có nhãn `target_return_10d`, còn **10 phiên cuối cùng chưa có nhãn `target_return_10d`** gán `split = "live"` (giữ `target_* = NaN` để Phần 3 dự báo tín hiệu mới nhất cho Tab 5).
+  - Chỉ `dropna()` trên các cột feature (bỏ 60 phiên đầu 2019), lưu ra `data/processed/features_all.parquet`.
 
 ### Bước 2: Xây dựng `src/processing/{pca_clustering,graph_pagerank}.py` tạo `clusters_pca.csv` và `graph_pagerank.csv`
 - [ ] **Chống Look-ahead Bias bắt buộc**: Chỉ lọc dữ liệu lịch sử `split in ("train", "validation")` (`date <= "2024-12-31"`) trước khi tính PCA/K-Means và PageRank (tuyệt đối không dùng tập `test 2025–2026`).
@@ -84,8 +84,11 @@
 python -c "
 import pandas as pd
 df = pd.read_parquet('data/processed/features_all.parquet')
-assert set(df['split'].unique()) == {'train', 'validation', 'test'}
-assert df.isna().sum().sum() == 0, 'Still contains NaN values!'
+assert set(df['split'].unique()) == {'train', 'validation', 'test', 'live'}
+target_cols = ['target_return_10d', 'target_class', 'max_high_next_10d', 'min_low_next_10d']
+feature_cols = [c for c in df.columns if c not in target_cols]
+assert df[feature_cols].isna().sum().sum() == 0, 'Feature columns still contain NaN!'
+assert df[df['split'] != 'live'][target_cols].isna().sum().sum() == 0, 'Labeled splits contain NaN targets!'
 print('OK features_all.parquet:', df.shape)
 print('OK clusters_pca.csv:', pd.read_csv('data/processed/clusters_pca.csv').shape)
 print('OK graph_pagerank.csv:', pd.read_csv('data/processed/graph_pagerank.csv').shape)

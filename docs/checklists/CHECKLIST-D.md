@@ -18,13 +18,13 @@
 ## 2. Công Nghệ & Các Công Thức Tài Chính Chuẩn
 
 - **Thư viện**: `pandas`, `numpy`, `plotly.express`, `plotly.graph_objects`.
-- **Bộ chỉ số tài chính bắt buộc tính trong `src/backtest.py`**:
+- **Bộ chỉ số tài chính bắt buộc tính trong `src/backtesting/`**:
   1. **Chi phí giao dịch ròng cho 1 vòng lệnh (Round-trip Cost tại Việt Nam)**:
      $$\text{Total Fee Rate} = \text{Phí mua } (0.15\%) + \text{Phí bán } (0.15\%) + \text{Thuế bán } (0.10\%) = 0.40\%$$
   2. **Tỷ suất sinh lời kép hàng năm (CAGR)**:
      $$\text{CAGR} = \left(\frac{V_{\text{final}}}{V_{\text{initial}}}\right)^{\frac{252}{N_{\text{trading\_days}}}} - 1$$
-  3. **Tỷ số Sharpe (Annualized Sharpe Ratio — Lãi suất phi rủi ro VN $R_f = 4.5\%/\text{năm}$)**:
-     $$\text{Sharpe} = \frac{\overline{r_d - r_{f,d}}}{\sigma(r_d)} \times \sqrt{252}$$
+  3. **Tỷ số Sharpe & Sortino (dùng lãi suất phi rủi ro động từ `sbv_policy_rate` trong `macro.parquet`)**:
+     $$\text{Sharpe} = \frac{\overline{r_d - r_{f,d}}}{\sigma(r_d)} \times \sqrt{252}, \quad \text{Sortino} = \frac{\overline{r_d - r_{f,d}}}{\sigma_{\text{down}}(r_d)} \times \sqrt{252}$$
   4. **Mức sụt giảm vốn tối đa từ đỉnh (Maximum Drawdown — MDD)**:
      $$\text{Drawdown}_t = \frac{\text{NAV}_t - \max_{s \le t} \text{NAV}_s}{\max_{s \le t} \text{NAV}_s}, \quad \text{MDD} = \min_t (\text{Drawdown}_t)$$
 
@@ -33,7 +33,7 @@
 ## 3. Lộ Trình Các Bước Thực Hiện Chi Tiết (Step-by-Step Checklist)
 
 ### Bước 1: Viết Hàm Quét Ngưỡng Xác Suất (`Threshold Tuning` trên tập `validation` — 0% Data Leak)
-- [ ] Đọc `data/processed/predictions.parquet` và lọc lấy tập **`split == "validation"` (2024)** để quét chọn ngưỡng tối ưu $\tau^*$ (tuyệt đối không tune trên `test`).
+- [ ] Đọc `data/processed/predictions.parquet` và lọc lấy tập **`split == "validation"` (2024), đồng thời purge bỏ 10 phiên cuối năm 2024** (để cửa sổ nắm giữ 10 phiên không tràn sang giá đầu tháng 01/2025 của tập `test`).
 - [ ] Với 2 mô hình chính (`proba_rf` và `proba_lgbm`), quét ngưỡng xác suất $\tau \in [0.50, 0.52, 0.54, \dots, 0.70]$:
   - Tại mỗi ngưỡng $\tau$, xác định các lệnh mua khi `proba >= tau` (khớp mua ở **`open_{t+1}`** của phiên kế tiếp).
   - Tính:
@@ -59,12 +59,12 @@
      - **Tái đầu tư lãi kép (Compounding)**: Cập nhật `NAV` theo từng ngày giao dịch.
 
 ### Bước 3: Xuất Bảng Tổng Hợp & Đường Cong Vốn Cho Người E
-- [ ] Xuất bảng so sánh 5 chiến lược ra `data/processed/backtest_summary.csv`.
-- [ ] Xuất chuỗi thời gian tài sản ròng hàng ngày (`NAV`) và mức sụt giảm (`Drawdown %`) ra `data/processed/equity_curve.parquet`.
+- [ ] Xuất bảng so sánh **6 chiến lược** ra `data/processed/backtest_summary.csv`.
+- [ ] Xuất chuỗi thời gian tài sản ròng hàng ngày (`NAV`) và mức sụt giảm (`Drawdown %`) ra `data/processed/equity_curve.parquet` (gồm đủ `equal_weight_vn30_nav` và `best_model_top3_nav`).
 
 ### Bước 4: Hoàn thiện `notebooks/04_backtest_sim.ipynb`
-- [ ] Vẽ biểu đồ 2 trục (Dual-axis Chart) hoặc Bubble Chart: `Threshold` vs `Precision` vs `CAGR` vs `Số lệnh/ngày` (chứng minh vì sao ngưỡng `0.55 - 0.58` là vùng tối ưu Sweet Spot).
-- [ ] Vẽ biểu đồ đường cong vốn (`Equity Curve`) so sánh 5 chiến lược với `VN-Index`.
+- [ ] Vẽ biểu đồ 2 trục (Dual-axis Chart) hoặc Bubble Chart: `Threshold` vs `Precision` vs `CAGR` vs `Số lệnh/ngày` (chứng minh vùng tối ưu Sweet Spot trên Validation).
+- [ ] Vẽ biểu đồ đường cong vốn (`Equity Curve`) so sánh **6 chiến lược** với `VN-Index` và `Savings SBV`.
 - [ ] Vẽ biểu đồ `Underwater Drawdown Chart` chứng minh cơ chế `Top-3 + Stop-loss` giúp giảm thiểu rủi ro sụt giảm tài khoản khi thị trường điều chỉnh.
 
 ---

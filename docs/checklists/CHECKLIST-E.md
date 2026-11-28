@@ -2,7 +2,7 @@
 
 > **Vai trò của bạn**: Chịu trách nhiệm **Tầng 5 (Tích hợp Hệ thống, Xây dựng Web App Dashboard bằng Streamlit, Tự động hóa Pipeline và Biên tập Báo cáo PDF / Slide Bảo vệ)**.
 > - **Bao phủ kiến thức môn `02-ds`**: **Bài L1** (Tổng quan quy trình & Sản phẩm hỗ trợ ra quyết định), **Bài L5–6** (Thiết kế Dashboard trực quan hóa đa chiều), và tiêu chí bắt buộc của giảng viên: *"Cần hoàn thiện giao diện mới được 9.5"* + *"Hệ thống chạy thử nghiệm dễ sử dụng, có hướng dẫn cài đặt rõ ràng"*.
-> - **Tại sao việc của bạn rất nhàn và không bao giờ bị nghẽn**: Ngay từ Ngày 1, bạn viết `scripts/generate_mock_data.py` sinh ra các file kết quả mẫu trong `data/processed/`. Giao diện `app/streamlit_app.py` của bạn **chỉ đọc các file `.parquet` và `.csv` đó để vẽ biểu đồ**, không cần chờ A, B, C, D chạy xong thuật toán!
+> - **Tại sao việc của bạn rất nhàn và không bao giờ bị nghẽn**: Giao diện `src/dashboard/app.py` đọc trực tiếp các file `.parquet`/`.csv` trong `data/raw/` và `data/processed/` (cùng hàm `simulate_strategy()` từ `src/backtesting/` cho slider Tab 4).
 
 ---
 
@@ -51,7 +51,7 @@ Thiết kế giao diện sáng sủa, có Sidebar bên trái chọn Mã cổ phi
   - Bảng tổng hợp hiệu quả tài chính (`CAGR`, `Sharpe Ratio`, `Max Drawdown`, `Win Rate`) đọc từ `backtest_summary.csv`.
   - Biểu đồ Đường cong tăng trưởng vốn (`Equity Curve`) so sánh 6 chiến lược (đọc từ `equity_curve.parquet`).
 - [ ] **Tab 5 — Khuyến Nghị Tín Hiệu Giao Dịch Mới Nhất**:
-  - Lọc ngày mới nhất trong `predictions.parquet`, join nhẹ với `features_all.parquet` để lấy `sentiment_score`, xếp hạng giảm dần theo `proba_lgbm` và hiển thị **Top 3 Cổ phiếu VN30 khuyến nghị giải ngân**, kèm mức giá cắt lỗ (`-7%`) / chốt lời (`+15%`) dự kiến.
+  - Lọc ngày mới nhất từ `split == "live"` trong `predictions.parquet`, join nhẹ với `features_all.parquet` để lấy `sentiment_score`, xếp hạng giảm dần theo xác suất của model quán quân và hiển thị **Top 3 Cổ phiếu VN30 khuyến nghị giải ngân**, kèm mức giá cắt lỗ (`-7%`) / chốt lời (`+15%`) dự kiến.
 
 ### Bước 3: Viết `main.py` Chạy Tự Động Toàn Bộ Pipeline
 - [ ] Kết nối 4 hàm entrypoint của Người A, B, C, D theo đúng thứ tự trong [API_CONTRACTS.md](API_CONTRACTS.md).
@@ -75,5 +75,5 @@ Thiết kế giao diện sáng sủa, có Sidebar bên trái chọn Mã cổ phi
 python main.py --mode offline
 
 # 2. Khởi động giao diện Web Dashboard kiểm tra cả 5 Tabs
-streamlit run app/streamlit_app.py
+uv run streamlit run src/dashboard/app.py
 ```

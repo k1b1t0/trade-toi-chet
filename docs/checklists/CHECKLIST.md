@@ -18,27 +18,26 @@
 
 ## 2. Checklist Phối Hợp Theo Từng Mốc (Team Milestones)
 
-### Mốc 0: Khởi tạo Môi trường & Mock Data (Làm ngay trong 15 phút đầu tiên)
-- [ ] **Người E** khởi tạo `src/config.py`, `pyproject.toml`, `requirements.txt` và `scripts/generate_mock_data.py`.
-- [ ] Cả 5 thành viên kéo repo về, cài môi trường (`uv sync` hoặc `pip install -r requirements.txt`) và chạy `python scripts/generate_mock_data.py`.
-- [ ] Kiểm tra thư mục `data/raw/` và `data/processed/` đã có đủ các file mẫu đúng chuẩn [API_CONTRACTS.md](API_CONTRACTS.md).
+### Mốc 0: Khởi tạo Môi trường & Hợp đồng Dữ liệu
+- [x] Khởi tạo `src/config.py`, `pyproject.toml` và kiểm tra hợp đồng [API_CONTRACTS.md](../architecture/API_CONTRACTS.md).
+- [x] Cả 5 thành viên kéo repo về và cài môi trường bằng `uv sync`.
 
-### Mốc 1: Phát triển Độc lập & Song song (Ngày 1 – Ngày 2)
-- [ ] **Người A**: Hoàn thành `src/ingest.py` (kéo 30 mã VN30 + VN-Index + Vĩ mô) và `src/crawler.py` (cào tin tức CafeF/Vietstock + chấm điểm cảm xúc).
-- [ ] **Người B**: Hoàn thành `src/features.py` (ghép bảng, khử missing/outliers, tính 25+ biến kỹ thuật) và `src/eda_graph.py` (PCA + K-Means + Đồ thị PageRank) chạy mượt trên dữ liệu mẫu.
-- [ ] **Người C**: Hoàn thành `src/models.py` (huấn luyện nhánh Regression 3 models + nhánh Classification 5 models gồm cả LSTM nhẹ, xuất bảng đối sánh 2 bài báo SOTA) chạy mượt trên dữ liệu mẫu.
-- [ ] **Người D**: Hoàn thành `src/backtest.py` (quét ngưỡng Threshold 0.50–0.70, mô phỏng giao dịch T+2.5 có phí 0.15% + thuế 0.1% + Stop-loss/Take-profit) chạy mượt trên dữ liệu mẫu.
-- [ ] **Người E**: Hoàn thành `app/streamlit_app.py` (5 Tabs tương tác đọc từ `data/processed/`) và `main.py`.
+### Mốc 1: Phát triển Độc lập & Song song theo Sub-packages
+- [x] **Phân hệ 01 (`src/ingestion/`)**: Kéo giá 30 mã VN30 + VN-Index (Entrade/DNSE), vĩ mô (Yahoo Finance `VND=X` + SBV) và cào tin CafeF kèm `pub_time` + model cảm xúc leak-free (`<= 2023-12-31`).
+- [ ] **Phân hệ 02 (`src/processing/`)**: Ghép bảng, làm sạch OHLC vector hóa, tính 25+ biến kỹ thuật không đơn vị, giữ 10 phiên cuối (`split='live'`), PCA/K-Means và Đồ thị PageRank (`<= 2024-12-31`).
+- [ ] **Phân hệ 03 (`src/modeling/`)**: Huấn luyện 1-Pass (purge 10 phiên cuối `train`) gồm Regression 3 models + Classification 5 models (`Logistic`, `DT`, `RF`, `LightGBM`, `MLP`), đối sánh `PLOS ONE 2025` và xuất `sota_benchmark.csv` (dùng `sMAPE`).
+- [ ] **Phân hệ 04 (`src/backtesting/`)**: Quét ngưỡng trên `validation` (đã purge 10 phiên cuối 2024), mô phỏng 6 chiến lược trên `test` (khớp `open_{t+1}`, T+3 xấp xỉ T+2.5, max 10 slot) và export `simulate_strategy()`.
+- [ ] **Phân hệ 05 (`src/dashboard/app.py` & `main.py`)**: 5 Tabs tương tác và pipeline chạy tự động (`--mode offline` / `--mode live`).
 
-### Mốc 2: Ghép nối Dữ liệu Thật & Chạy Thực Nghiệm (Ngày 3 – Ngày 4)
-- [ ] **Người A** bàn giao 3 file thật vào `data/raw/` (`prices.parquet`, `news_sentiment.parquet`, `macro.parquet`) và chạy sạch `notebooks/01_data_crawling.ipynb`.
-- [ ] **Người B** chạy code trên dữ liệu thật của Người A, bàn giao `features_all.parquet`, `clusters_pca.csv`, `graph_pagerank.csv` và chạy sạch `notebooks/02_eda_and_graph.ipynb`.
-- [ ] **Người C** chạy huấn luyện trên `features_all.parquet` thật, bàn giao `predictions.parquet`, `sota_benchmark.csv`, `feature_importance.csv` và chạy sạch `notebooks/03_modeling_sota.ipynb`.
-- [ ] **Người D** chạy mô phỏng trên `predictions.parquet` thật, bàn giao `threshold_tuning.csv`, `backtest_summary.csv`, `equity_curve.parquet` và chạy sạch `notebooks/04_backtest_sim.ipynb`.
+### Mốc 2: Ghép nối Dữ liệu Thật & Chạy Thực Nghiệm
+- [x] **Phân hệ 01** bàn giao `data/raw/{prices,news_sentiment,macro,sentiment_labels}.parquet` + `sentiment_tfidf.joblib` và chạy sạch `notebooks/01_data_crawling.ipynb`.
+- [ ] **Phân hệ 02** bàn giao `features_all.parquet`, `clusters_pca.csv`, `graph_pagerank.csv` và chạy sạch `notebooks/02_eda_and_graph.ipynb`.
+- [ ] **Phân hệ 03** bàn giao `predictions.parquet`, `sota_benchmark.csv`, `feature_importance.csv` và chạy sạch `notebooks/03_modeling_sota.ipynb`.
+- [ ] **Phân hệ 04** bàn giao `threshold_tuning.csv`, `backtest_summary.csv`, `equity_curve.parquet` và chạy sạch `notebooks/04_backtest_sim.ipynb`.
 
-### Mốc 3: Kiểm tra Tiêu chuẩn Điểm 9.5 & Đóng gói Nộp bài (Ngày 5 – Ngày 6)
-- [ ] **Kiểm định Tiêu chí 1 (Web Crawling - Bài L2)**: Trong Notebook 01 và Tab 1 Streamlit có bảng tin tức tiếng Việt thực tế cào từ CafeF/Vietstock kèm điểm cảm xúc.
-- [ ] **Kiểm định Tiêu chí 2 (EDA, PCA/K-Means & Đồ thị PageRank - Bài L3, L4, L10-11)**: Trong Notebook 02 và Tab 2 Streamlit có biểu đồ phân cụm 30 mã VN30 và đồ thị mạng lưới tương quan PageRank.
-- [ ] **Kiểm định Tiêu chí 3 (Đối sánh 2 Bài báo SOTA - Bài L7, L12)**: Trong Notebook 03, Tab 3 Streamlit và Chương 4 Báo cáo có bảng đối đầu kết quả thực nghiệm của nhóm với Paper Nature (2024) và Paper PLOS ONE (2025).
-- [ ] **Kiểm định Tiêu chí 4 (Đánh giá Đa chiều & Thực chiến T+2.5)**: Trong Notebook 04 và Tab 4 Streamlit có đủ chỉ số ML (`RMSE`, `MAE`, `Precision`, `F1`, `ROC-AUC`) và chỉ số Tài chính (`CAGR`, `Sharpe`, `Max Drawdown`).
-- [ ] **Kiểm định Tiêu chí 5 (Web App & Hồ sơ bàn giao)**: Chạy `python main.py --mode offline` dưới 30 giây không lỗi; `streamlit run app/streamlit_app.py` hiển thị đẹp cả 5 Tab; xuất file Báo cáo PDF và file nén mã nguồn kèm `README.md`.
+### Mốc 3: Kiểm tra Tiêu chuẩn Điểm 9.5 & Đóng gói Nộp bài
+- [x] **Tiêu chí 1 (Web Crawling - Bài L2)**: Notebook 01 & `news_sentiment.parquet` chứa tin tức CafeF thực tế kèm `pub_time` và điểm cảm xúc leak-free.
+- [ ] **Tiêu chí 2 (EDA, PCA/K-Means & PageRank - Bài L3, L4, L10-11)**: Notebook 02 & Tab 2 Streamlit có biểu đồ phân cụm 30 mã VN30 và đồ thị mạng lưới tương quan PageRank.
+- [ ] **Tiêu chí 3 (Đối sánh SOTA - Bài L7, L12)**: Notebook 03, Tab 3 Streamlit và Chương 4 Báo cáo có bảng đối sánh thực nghiệm với `PLOS ONE (2025)` (nhắc thêm `Nature 2024` ở Related Work).
+- [ ] **Tiêu chí 4 (Đánh giá Đa chiều & Thực chiến T+3/T+2.5)**: Notebook 04 & Tab 4 Streamlit có đủ ML metrics (`RMSE`, `MAE`, `sMAPE`, `Precision`, `F1`, `ROC-AUC`) và Financial metrics (`CAGR`, `Sharpe`, `Sortino`, `Max Drawdown`, `Win Rate`).
+- [ ] **Tiêu chí 5 (Web App & DoD)**: `ruff check`, `ty check`, `uv run pytest -v` PASS 100%; `uv run streamlit run src/dashboard/app.py` hiển thị đẹp cả 5 Tabs.

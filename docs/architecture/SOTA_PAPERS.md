@@ -1,8 +1,8 @@
 # SOTA_PAPERS.md — Hồ Sơ 2 Bài Báo Khoa Học Quốc Tế Đối Chiếu Trong Đồ Án (`projects/capstone/`)
 
 > **Mục đích**: Cung cấp toàn bộ thông tin học thuật, kiến trúc mô hình, chỉ số đánh giá và bảng đối chiếu mẫu từ **2 bài báo khoa học quốc tế (Q1/Q2 Open Access)** nghiên cứu trực tiếp trên **Thị trường Chứng khoán Việt Nam (HOSE / VN30)**.
-> - **File PDF & Text nguyên bản** đã được tải về sẵn tại thư mục: `sources/papers/`.
-> - **Người C (ML & SOTA)** và **Người E (Report Lead)** sử dụng trực tiếp tài liệu này để cài đặt mô hình đối sánh và viết Chương 4 của Báo cáo PDF.
+> - **File PDF & Text nguyên bản** đã được tải về sẵn tại thư mục: `docs/papers/`.
+> - **Phân hệ 03 (ML & SOTA)** benchmark chính theo bài **PLOS ONE (2025)** (`Linear/Logistic`, `Decision Tree`, `Random Forest`, `LightGBM`, `MLP` — thuần `scikit-learn` + `LightGBM`), và trích dẫn bài **Nature (2024)** ở phần Related Work.
 
 ---
 
@@ -14,8 +14,8 @@
 - **Tạp chí**: *Humanities and Social Sciences Communications* (Nature Portfolio), 11(1), Article 393.
 - **DOI**: `https://doi.org/10.1057/s41599-024-02807-x`
 - **File trong kho**:
-  - PDF: `sources/papers/nature-2024-vn30-ml-prediction.pdf`
-  - Text: `sources/papers/nature-2024-vn30-ml-prediction.txt`
+  - PDF: `docs/papers/nature-2024-vn30-ml-prediction.pdf`
+  - Text: `docs/papers/nature-2024-vn30-ml-prediction.txt`
 
 ### 1.2. Tóm tắt Phương pháp & Kết quả của Bài báo
 1. **Tập dữ liệu**: Lấy đúng danh sách **30 cổ phiếu rổ VN30** (ACB, BID, CTG, FPT, GAS, HDB, HPG, MBB, MSN, MWG, SSI, STB, TCB, VCB, VHM, VIC, VNM, VPB...) và chỉ số **VN-Index** trên sàn HOSE.
@@ -41,8 +41,8 @@
 - **Tạp chí**: *PLOS ONE*, 20(9), e0332154.
 - **DOI**: `https://doi.org/10.1371/journal.pone.0332154`
 - **File trong kho**:
-  - PDF: `sources/papers/plosone-2025-vn-stock-ml.pdf`
-  - Text: `sources/papers/plosone-2025-vn-stock-ml.txt`
+  - PDF: `docs/papers/plosone-2025-vn-stock-ml.pdf`
+  - Text: `docs/papers/plosone-2025-vn-stock-ml.txt`
 
 ### 2.2. Tóm tắt Phương pháp & Kết quả của Bài báo
 1. **Tập dữ liệu**: Các doanh nghiệp niêm yết trên sàn **HOSE (Việt Nam)** giai đoạn **2019–2024**.
