@@ -8,11 +8,11 @@
 
 | Thành viên | Vai trò (Role) | Bài giảng `02-ds` phụ trách | File đặc tả chi tiết | File Code & Notebook sở hữu |
 |---|---|---|---|---|
-| **Người A** | **Data Ingestion & Web Crawling Engineer** | **L2** (Web Crawling), **L8** (Parquet Storage), **L10-11** (Text Sentiment) | [CHECKLIST-A.md](CHECKLIST-A.md) | `src/ingest.py`, `src/crawler.py`<br>`notebooks/01_data_crawling.ipynb` |
-| **Người B** | **Data Integration, EDA, Clustering & Graph Analyst** | **L3** (Cleaning/Integration), **L4** (EDA/PCA/K-Means), **L5-6** (DataViz), **L10-11** (Link Analysis PageRank) | [CHECKLIST-B.md](CHECKLIST-B.md) | `src/features.py`, `src/eda_graph.py`<br>`notebooks/02_eda_and_graph.ipynb` |
-| **Người C** | **Machine Learning & SOTA Paper Benchmark Engineer** | **L7** (Linear/Logistic & Random Forest), **L12** (Model Evaluation & SOTA Benchmark) | [CHECKLIST-C.md](CHECKLIST-C.md) | `src/models.py`<br>`notebooks/03_modeling_sota.ipynb` |
-| **Người D** | **Quantitative Backtesting & Risk Simulation Engineer** | **L12** (Experimental Evaluation & Threshold Tuning), **SMA Module 4 & 5** (Backtest T+2.5) | [CHECKLIST-D.md](CHECKLIST-D.md) | `src/backtest.py`<br>`notebooks/04_backtest_sim.ipynb` |
-| **Người E** | **Streamlit UI, Automation & Final Report Lead** | **L1** (Overview & Problem), **L5-6** (Interactive Dashboard), **E2E Automation** | [CHECKLIST-E.md](CHECKLIST-E.md) | `app/streamlit_app.py`, `main.py`, `src/config.py`<br>`docs/report_outline.md` |
+| **Người A** | **Data Ingestion & Web Crawling Engineer** | **L2** (Web Crawling), **L8** (Parquet Storage), **L10-11** (Text Sentiment) | [CHECKLIST-A.md](CHECKLIST-A.md) | `src/ingestion/`, `tests/test_ingestion.py`<br>`notebooks/01_data_crawling.ipynb`, `docs/modules/01-ingestion.md` |
+| **Người B** | **Data Integration, EDA, Clustering & Graph Analyst** | **L3** (Cleaning/Integration), **L4** (EDA/PCA/K-Means), **L5-6** (DataViz), **L10-11** (Link Analysis PageRank) | [CHECKLIST-B.md](CHECKLIST-B.md) | `src/processing/`, `tests/test_processing.py`<br>`notebooks/02_eda_and_graph.ipynb`, `docs/modules/02-processing.md` |
+| **Người C** | **Machine Learning & SOTA Paper Benchmark Engineer** | **L7** (Linear/Logistic & Random Forest), **L12** (Model Evaluation & SOTA Benchmark) | [CHECKLIST-C.md](CHECKLIST-C.md) | `src/modeling/`, `tests/test_modeling.py`<br>`notebooks/03_modeling_sota.ipynb`, `docs/modules/03-modeling.md` |
+| **Người D** | **Quantitative Backtesting & Risk Simulation Engineer** | **L12** (Experimental Evaluation & Threshold Tuning), **SMA Module 4 & 5** (Backtest T+2.5) | [CHECKLIST-D.md](CHECKLIST-D.md) | `src/backtesting/`, `tests/test_backtesting.py`<br>`notebooks/04_backtest_sim.ipynb`, `docs/modules/04-backtesting.md` |
+| **Người E** | **Streamlit UI, Automation & Final Report Lead** | **L1** (Overview & Problem), **L5-6** (Interactive Dashboard), **E2E Automation** | [CHECKLIST-E.md](CHECKLIST-E.md) | `src/dashboard/`, `main.py`, `tests/test_dashboard.py`<br>`docs/modules/05-dashboard.md` |
 
 ---
 

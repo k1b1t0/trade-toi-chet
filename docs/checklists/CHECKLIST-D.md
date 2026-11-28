@@ -8,8 +8,10 @@
 
 ## 1. Các File Bạn Sở Hữu (Chỉ mình bạn code vào các file này)
 
-1. `src/backtest.py` — Engine quét ngưỡng xác suất và mô phỏng danh mục đầu tư theo thời gian thực trên tập Test.
-2. `notebooks/04_backtest_sim.ipynb` — Notebook trình bày bài toán đánh đổi giữa `Precision` vs `Số lệnh giao dịch/ngày` vs `CAGR`, biểu đồ đường cong tài sản (Equity Curve) và phân tích sụt giảm vốn (Drawdown) để đưa vào Chương 5 của Báo cáo PDF.
+1. `src/backtesting/` — Sub-package (chia file `< 130` dòng, export `run_backtest_simulations` tại `__init__.py`, có `cli.py`) thực hiện quét ngưỡng xác suất và mô phỏng danh mục đầu tư theo thời gian thực trên tập Test.
+2. `tests/test_backtesting.py` — Unit tests logic T+2.5 / phí-thuế / SL-TP & Data Contract tests khớp `API_CONTRACTS.md`.
+3. `notebooks/04_backtest_sim.ipynb` — Notebook trình bày bài toán đánh đổi giữa `Precision` vs `Số lệnh giao dịch/ngày` vs `CAGR`, biểu đồ đường cong tài sản (Equity Curve) và phân tích sụt giảm vốn (Drawdown) để đưa vào Chương 5 của Báo cáo PDF.
+4. `docs/modules/04-backtesting.md` — Tài liệu kỹ thuật chi tiết của phân hệ.
 
 ---
 
@@ -42,16 +44,17 @@
 
 ### Bước 2: Viết Engine Mô Phỏng Danh Mục Nâng Cao Chuẩn T+2.5 Việt Nam (Kế thừa Module 5)
 - [ ] Thiết lập vốn khởi đầu chuẩn: `initial_capital_vnd = 100_000_000` (100 triệu VNĐ).
-- [ ] Thực hiện mô phỏng so sánh **5 Chiến lược** trên tập Test:
-  1. **`Buy & Hold VN-Index` (Benchmark 1)**: Mua và nắm giữ chỉ số thị trường chung từ đầu đến cuối kỳ Test.
-  2. **`Equal-Weight VN30` (Benchmark 2)**: Phân bổ đều vào 30 mã VN30.
-  3. **`Random Forest (Rule Threshold >= 0.55)`**: Mua các mã có `proba_rf >= 0.55`, giữ cố định 10 phiên, trừ phí & thuế `0.40%`.
-  4. **`LSTM SOTA (Paper Nature 2024)`**: Mua theo tín hiệu của `proba_lstm_sota >= 0.55`, trừ phí & thuế `0.40%`.
-  5. **`LightGBM Top-3 + Quản trị rủi ro T+2.5` (Chiến lược Đề xuất của Nhóm)**:
+- [ ] Thực hiện mô phỏng so sánh **6 Chiến lược** trên tập Test:
+  1. **`Savings Benchmark (SBV Policy Rate)` (Benchmark 0 — Gửi tiết kiệm phi rủi ro)**: Lãi kép theo từng phiên giao dịch từ `sbv_policy_rate` ($r_{f,\text{daily}} = (1 + r_{\text{annual}})^{1/252} - 1$), Drawdown = `0%`, xuất cột `sbv_savings_nav` để kiểm chứng chiến lược AI có thắng gửi tiết kiệm không.
+  2. **`Buy & Hold VN-Index` (Benchmark 1)**: Mua và nắm giữ chỉ số thị trường chung từ đầu đến cuối kỳ Test.
+  3. **`Equal-Weight VN30` (Benchmark 2)**: Phân bổ đều vào 30 mã VN30.
+  4. **`Random Forest (Rule Threshold >= 0.55)`**: Mua các mã có `proba_rf >= 0.55`, giữ cố định 10 phiên, trừ phí & thuế `0.40%`.
+  5. **`LSTM SOTA (Paper Nature 2024)`**: Mua theo tín hiệu của `proba_lstm_sota >= 0.55`, trừ phí & thuế `0.40%`.
+  6. **`LightGBM Top-3 + Quản trị rủi ro T+2.5` (Chiến lược Đề xuất của Nhóm)**:
      - Mỗi ngày, lọc các mã có `proba_lgbm >= 0.55`, xếp hạng giảm dần và chỉ chọn tối đa **Top 3 mã có xác suất cao nhất** (Lazy Optimization từ Module 5).
-     - **Áp dụng quy tắc T+2.5 & Stop-loss / Take-profit**:
+     - **Áp dụng quy tắc T+2.5 & Stop-loss / Take-profit (thận trọng)**:
        - Trong 2 ngày đầu (`t+1, t+2`), hàng chưa về tài khoản nên không thể bán.
-       - Từ ngày `t+3` đến `t+10` (dựa vào `min_low_next_10d` và `max_high_next_10d`):
+       - Từ ngày `t+3` đến `t+10` (quét tuần tự từng phiên từ `prices.parquet`, hoặc nếu dùng `min_low_next_10d` & `max_high_next_10d` và cả hai cùng chạm ngưỡng thì **ưu tiên tính Stop-loss trước** để đảm bảo thận trọng):
          - Nếu giá chạm ngưỡng cắt lỗ `-7%` (`Stop-loss`) $\to$ đóng lệnh tại `-7%` trừ phí `0.40%`.
          - Nếu giá chạm ngưỡng chốt lời sớm `+15%` (`Take-profit`) $\to$ đóng lệnh tại `+15%` trừ phí `0.40%`.
          - Ngược lại $\to$ đóng lệnh vào cuối phiên `t+10` với `target_return_10d` trừ phí `0.40%`.

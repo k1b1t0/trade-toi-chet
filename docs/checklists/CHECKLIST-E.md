@@ -9,9 +9,10 @@
 ## 1. Các File Bạn Sở Hữu (Chỉ mình bạn code vào các file này)
 
 1. `src/config.py` & `scripts/generate_mock_data.py` — Cấu hình hằng số dùng chung và script khởi tạo dữ liệu mẫu Ngày 1 cho cả nhóm.
-2. `app/streamlit_app.py` — Ứng dụng Web Dashboard tương tác gồm 5 Tabs trình diễn toàn bộ kết quả của nhóm.
-3. `main.py` — Script CLI tự động chạy nối tiếp các hàm của Người A $\to$ B $\to$ C $\to$ D bằng 1 câu lệnh duy nhất.
-4. `docs/report_outline.md` & `docs/slide_outline.md` — Khung báo cáo PDF 6 chương và Slide thuyết trình 15 phút.
+2. `src/dashboard/` (`app.py` và các tab module `< 130` dòng) — Ứng dụng Web Dashboard tương tác gồm 5 Tabs trình diễn toàn bộ kết quả của nhóm.
+3. `main.py` — Script CLI tự động chạy nối tiếp các entrypoint sub-package của Phân hệ 01 $\to$ 02 $\to$ 03 $\to$ 04 bằng 1 câu lệnh duy nhất.
+4. `tests/test_dashboard.py` & `docs/modules/05-dashboard.md` — Bộ kiểm thử giao diện/pipeline và tài liệu kỹ thuật.
+5. `docs/report_outline.md` & `docs/slide_outline.md` — Khung báo cáo PDF 6 chương và Slide thuyết trình 15 phút.
 
 ---
 

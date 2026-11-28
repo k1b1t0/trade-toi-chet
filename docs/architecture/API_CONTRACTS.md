@@ -94,20 +94,20 @@ Bảng trung tâm đã gộp 3 nguồn của Người A, làm sạch, tính toá
 | **Định danh & Chia tập** | `date`, `ticker`, `sector`, `split` | `datetime64[ns]`, `str`, `str`, `str` | `split` nhận đúng 1 trong 3 giá trị: `"train"`, `"validation"`, `"test"`. |
 | **Giá gốc (để Backtest)** | `open`, `high`, `low`, `close`, `volume` | `float64` | Giữ nguyên giá thực tế để Người D tính lời/lỗ. |
 | **Đặc trưng Lợi nhuận trễ (Lag Returns)** | `return_1d`, `return_3d`, `return_5d`, `return_10d`, `return_20d`, `return_60d` | `float64` | `(close_t / close_{t-k}) - 1`. |
-| **Chỉ báo Xu hướng (Trend)** | `sma_10`, `sma_20`, `sma_50`, `ema_12`, `ema_26`, `price_to_sma20`, `sma10_to_sma50`, `macd`, `macd_signal`, `macd_hist` | `float64` | Các tỷ lệ giá so với đường trung bình động và MACD chuẩn (khớp Paper Nature 2024). |
-| **Chỉ báo Động lượng & Biến động** | `rsi_14`, `stoch_k`, `stoch_d`, `bb_upper_ratio`, `bb_lower_ratio`, `bb_width`, `atr_14`, `natr_14`, `volatility_10d`, `volatility_20d` | `float64` | RSI (0-100), Bollinger Bands, Biên độ dao động ATR, Độ lệch chuẩn lợi nhuận. |
-| **Đặc trưng Khối lượng & Dòng tiền** | `ln_volume`, `volume_to_sma20`, `obv_slope_5d` | `float64` | Logarit khối lượng, đột biến khối lượng so với trung bình 20 phiên, độ dốc dòng tiền OBV. |
-| **Đặc trưng Tin tức & Vĩ mô** | `sentiment_score`, `sentiment_ma5`, `news_count`, `vnindex_return_1d`, `vnindex_return_10d`, `vnindex_volatility_20d`, `relative_strength_vs_vnindex`, `usd_vnd_rate`, `sbv_policy_rate` | `float64` | Nếu ngày đó không có tin tức thì `sentiment_score = 0.0`, `news_count = 0`. |
+| **Chỉ báo Xu hướng (Trend)** | `sma_10`, `sma_20`, `sma_50`, `ema_12`, `ema_26`, `price_to_sma20`, `sma10_to_sma50`, `macd`, `macd_signal`, `macd_hist`, `macd_norm`, `macd_hist_norm` | `float64` | Giữ `sma/ema/macd` gốc để vẽ biểu đồ; đưa vào ML chỉ dùng tỷ lệ không đơn vị (`price_to_sma20 = close/sma_20 - 1`, `sma10_to_sma50 = sma_10/sma_50 - 1`, `macd_norm = macd/close`, `macd_hist_norm = macd_hist/close`). |
+| **Chỉ báo Động lượng & Biến động** | `rsi_14`, `stoch_k`, `stoch_d`, `bb_upper_ratio`, `bb_lower_ratio`, `bb_width`, `atr_14`, `natr_14`, `volatility_10d`, `volatility_20d` | `float64` | RSI (0-100), Bollinger Ratios (`(close - bb)/close`, `bb_width = (upper-lower)/sma_20`), `natr_14 = atr_14/close` (dùng cho ML; giữ `atr_14` gốc để vẽ chart). |
+| **Đặc trưng Khối lượng & Dòng tiền** | `ln_volume`, `volume_to_sma20`, `obv_slope_5d` | `float64` | Logarit khối lượng, tỷ lệ khối lượng `volume / sma20(volume)`, độ dốc dòng tiền OBV chuẩn hóa. |
+| **Đặc trưng Tin tức & Vĩ mô** | `sentiment_score`, `sentiment_ma5`, `news_count`, `vnindex_return_1d`, `vnindex_return_10d`, `vnindex_volatility_20d`, `relative_strength_vs_vnindex`, `usd_vnd_rate`, `sbv_policy_rate` | `float64` | Yêu cầu backfill tin CafeF từ `2019-01-01`; ngày không có tin điền `sentiment_score = 0.0`, `news_count = 0`. `return_1d` chỉ clip an toàn `±15%` (giữ nguyên lịch sử HNX/UPCOM 2019–2021, không sửa `close`). |
 | **Biến Thời gian** | `month`, `weekday`, `quarter` | `int32` | Tháng (1-12), Thứ trong tuần (0-4), Quý (1-4) (khớp phát hiện Quý 1 Tết âm lịch của Paper PLOS ONE 2025). |
-| **Nhãn Dự báo (Targets)** | `target_return_10d`<br>`target_class`<br>`max_high_next_10d`<br>`min_low_next_10d` | `float64`<br>`int32`<br>`float64`<br>`float64` | - `target_return_10d = (close_{t+10} / close_t) - 1` (Dùng cho Regression).<br>- `target_class = 1` nếu `target_return_10d > 0.015` ngược lại `0` (Dùng cho Classification).<br>- `max_high_next_10d`, `min_low_next_10d`: Giá cao/thấp nhất từ `t+3` đến `t+10` (để Người D mô phỏng Take-profit / Stop-loss sau khi hàng T+2.5 về). |
+| **Nhãn Dự báo (Targets)** | `target_return_10d`<br>`target_class`<br>`max_high_next_10d`<br>`min_low_next_10d` | `float64`<br>`int32`<br>`float64`<br>`float64` | - `target_return_10d = (close_{t+10} / close_t) - 1` (Dùng cho Regression).<br>- `target_class = 1` nếu `target_return_10d > 0.015` ngược lại `0` (Dùng cho Classification).<br>- `max_high_next_10d`, `min_low_next_10d`: Giá cao/thấp nhất từ `t+3` đến `t+10` (để Phân hệ 04 mô phỏng Take-profit / Stop-loss sau khi hàng T+2.5 về). |
 
 ### 3.2. File `data/processed/clusters_pca.csv` (Phục vụ Bài L4: Phân cụm & Giảm chiều)
-Bảng 30 dòng (ứng với 30 mã VN30).
+Bảng 30 dòng (ứng với 30 mã VN30), **chỉ tính trên tập lịch sử `split in ("train", "validation")` (`date <= 2024-12-31`)** để tuyệt đối chống Look-ahead Bias.
 - **Các cột**: `ticker`, `sector`, `mean_annual_return`, `annual_volatility`, `sharpe_hist`, `pca_1`, `pca_2`, `cluster_id` (`int`: 0, 1, 2, 3), `cluster_name` (`str`: VD `"Cụm Tăng trưởng cao"`, `"Cụm Phòng thủ ổn định"`...).
 
 ### 3.3. File `data/processed/graph_pagerank.csv` (Phục vụ Bài L10-11: Phân tích liên kết mạng lưới)
-Bảng xếp hạng mức độ ảnh hưởng (PageRank & Degree Centrality) của 30 mã VN30 trong đồ thị tương quan.
-- **Các cột**: `ticker`, `sector`, `pagerank_score` (`float64`), `degree_centrality` (`float64`), `connected_peers` (`str`: danh sách các mã có tương quan $> 0.6$ cách nhau bởi dấu phẩy, VD `"CTG,MBB,TCB"`).
+Bảng xếp hạng mức độ ảnh hưởng (PageRank & Degree Centrality) của 30 mã VN30 trong đồ thị tương quan, **chỉ tính trên tập lịch sử `split in ("train", "validation")` (`date <= 2024-12-31`)**.
+- **Các cột**: `ticker`, `sector`, `pagerank_score` (`float64`), `degree_centrality` (`float64`), `connected_peers` (`str`: danh sách các mã có tương quan $\ge 0.6$ cách nhau bởi dấu phẩy, VD `"CTG,MBB,TCB"`).
 
 ---
 
@@ -146,40 +146,40 @@ Kết quả quét ngưỡng xác suất từ `0.50` đến `0.70` (bước nhả
 - **Các cột**: `model_col`, `threshold`, `total_trades`, `avg_trades_per_day`, `precision`, `win_rate`, `net_return_pct`, `cagr`, `sharpe_ratio`, `max_drawdown_pct`.
 
 ### 5.2. File `data/processed/backtest_summary.csv`
-Bảng so sánh hiệu quả tài chính trên tập Test giữa các chiến lược.
+Bảng so sánh hiệu quả tài chính trên tập Test giữa 6 chiến lược (gồm thêm Baseline gửi tiết kiệm theo lãi suất SBV).
 - **Các cột**:
-  `strategy_id`, `strategy_name` (VD: `"Buy & Hold VN-Index"`, `"Equal-Weight VN30"`, `"Random Forest (Threshold 0.55)"`, `"LightGBM Top-3 + T+2.5 StopLoss/TakeProfit"`, `"LSTM SOTA (Nature 2024)"`), `initial_capital_vnd`, `final_capital_vnd`, `total_return_pct`, `cagr_pct`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown_pct`, `total_trades`, `win_rate_pct`, `total_fees_and_tax_vnd`.
+  `strategy_id`, `strategy_name` (VD: `"Savings Benchmark (SBV Policy Rate)"`, `"Buy & Hold VN-Index"`, `"Equal-Weight VN30"`, `"Random Forest (Threshold 0.55)"`, `"LightGBM Top-3 + T+2.5 StopLoss/TakeProfit"`, `"LSTM SOTA (Nature 2024)"`), `initial_capital_vnd`, `final_capital_vnd`, `total_return_pct`, `cagr_pct`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown_pct`, `total_trades`, `win_rate_pct`, `total_fees_and_tax_vnd`.
 
 ### 5.3. File `data/processed/equity_curve.parquet`
 Chuỗi giá trị tài sản theo từng ngày trên tập Test để vẽ biểu đồ đường cong vốn (Equity Curve & Underwater Drawdown Chart).
-- **Các cột**: `date`, `vnindex_nav`, `rf_rule55_nav`, `lgbm_top3_nav`, `lstm_sota_nav`, `lgbm_drawdown_pct`, `vnindex_drawdown_pct`.
+- **Các cột**: `date`, `sbv_savings_nav`, `vnindex_nav`, `rf_rule55_nav`, `lgbm_top3_nav`, `lstm_sota_nav`, `lgbm_drawdown_pct`, `vnindex_drawdown_pct`.
 
 ---
 
-## 6. Hợp Đồng Chữ Ký Hàm Python (`src/*.py` Function Signatures)
+## 6. Hợp Đồng Chữ Ký Hàm Python (Sub-Package Entrypoints)
 
-Để `main.py` của Người E gọi tự động từ đầu đến cuối, mỗi file trong `src/` **bắt buộc cung cấp đúng hàm entrypoint sau**:
+Để `main.py` gọi tự động từ đầu đến cuối, mỗi sub-package trong `src/` **bắt buộc export đúng hàm entrypoint tại `__init__.py`** (khớp `AGENTS.md`):
 
 ```python
-# 1. Người A — src/ingest.py & src/crawler.py
+# 1. Phân hệ 01 — src/ingestion/__init__.py
 def run_ingestion(start_date: str, end_date: str, output_dir: Path) -> None:
     """Tải prices.parquet và macro.parquet vào output_dir (data/raw/)."""
 
 def run_news_crawler(tickers: list[str], output_dir: Path) -> None:
-    """Cào tin tức & tính điểm cảm xúc, lưu news_sentiment.parquet vào output_dir."""
+    """Cào tin tức CafeF (backfill từ 2019) & tính điểm cảm xúc, lưu news_sentiment.parquet."""
 
-# 2. Người B — src/features.py & src/eda_graph.py
+# 2. Phân hệ 02 — src/processing/__init__.py
 def build_feature_dataset(raw_dir: Path, processed_dir: Path) -> pd.DataFrame:
     """Đọc 3 file từ raw_dir, làm sạch, tính 25+ features, lưu features_all.parquet."""
 
 def run_eda_and_graph_analysis(features_path: Path, processed_dir: Path) -> None:
-    """Tính PCA/K-Means (clusters_pca.csv) và Đồ thị PageRank (graph_pagerank.csv)."""
+    """Tính PCA/K-Means (clusters_pca.csv) và Đồ thị PageRank (graph_pagerank.csv) trên tập <= 2024-12-31."""
 
-# 3. Người C — src/models.py
+# 3. Phân hệ 03 — src/modeling/__init__.py
 def train_and_evaluate_all_models(features_path: Path, processed_dir: Path) -> None:
-    """Huấn luyện Regression + Classification + SOTA, xuất predictions.parquet, sota_benchmark.csv, feature_importance.csv."""
+    """Huấn luyện Regression + Classification + SOTA (chỉ dùng FEATURE_COLS không đơn vị), xuất predictions.parquet, sota_benchmark.csv, feature_importance.csv."""
 
-# 4. Người D — src/backtest.py
+# 4. Phân hệ 04 — src/backtesting/__init__.py
 def run_backtest_simulations(predictions_path: Path, processed_dir: Path) -> None:
-    """Chạy quét ngưỡng và mô phỏng T+2.5, xuất threshold_tuning.csv, backtest_summary.csv, equity_curve.parquet."""
+    """Chạy quét ngưỡng và mô phỏng T+2.5 (kèm Baseline SBV), xuất threshold_tuning.csv, backtest_summary.csv, equity_curve.parquet."""
 ```

@@ -8,8 +8,10 @@
 
 ## 1. Các File Bạn Sở Hữu (Chỉ mình bạn code vào các file này)
 
-1. `src/models.py` — Module huấn luyện cả 2 nhánh mô hình (**Regression** & **Classification / SOTA**) và xuất dự báo cùng bảng metric.
-2. `notebooks/03_modeling_sota.ipynb` — Notebook trình bày chi tiết phương pháp chia dữ liệu chuỗi thời gian, quá trình huấn luyện, bảng so sánh đối đầu với 2 bài báo `Nature (2024)` và `PLOS ONE (2025)`, biểu đồ ROC Curve và Feature Importance để đưa thẳng vào Chương 4 của Báo cáo PDF.
+1. `src/modeling/` — Sub-package (chia file `< 130` dòng, export `train_and_evaluate_all_models` tại `__init__.py`, có `cli.py`) huấn luyện cả 2 nhánh mô hình (**Regression** & **Classification / SOTA**) và xuất dự báo cùng bảng metric.
+2. `tests/test_modeling.py` — Unit tests & Data Contract tests kiểm tra 3 file đầu ra khớp `API_CONTRACTS.md`.
+3. `notebooks/03_modeling_sota.ipynb` — Notebook trình bày chi tiết phương pháp chia dữ liệu chuỗi thời gian, quá trình huấn luyện, bảng so sánh đối đầu với 2 bài báo `Nature (2024)` và `PLOS ONE (2025)`, biểu đồ ROC Curve và Feature Importance để đưa thẳng vào Chương 4 của Báo cáo PDF.
+4. `docs/modules/03-modeling.md` — Tài liệu kỹ thuật chi tiết của phân hệ.
 
 ---
 
@@ -32,7 +34,7 @@
 
 ### Bước 1: Chuẩn bị Tập Đặc trưng & Chia Temporal Split (Chống Look-ahead Bias)
 - [ ] Đọc `data/processed/features_all.parquet`.
-- [ ] Định nghĩa danh sách các cột `FEATURE_COLS` (loại bỏ các cột định danh `date, ticker, sector, split`, giá thô `open, high, low, close, volume` và các cột nhãn `target_return_10d, target_class, max_high_next_10d, min_low_next_10d`).
+- [ ] Định nghĩa danh sách các cột `FEATURE_COLS` (chỉ dùng các chỉ báo **tỷ lệ `%` không đơn vị / đã chuẩn hóa** theo chuẩn `sma-zoomcamp`; loại bỏ các cột định danh `date, ticker, sector, split`, giá thô & chỉ báo đơn vị VNĐ tuyệt đối `open, high, low, close, volume, sma_10, sma_20, sma_50, ema_12, ema_26, atr_14, macd, macd_signal, macd_hist`, và các cột nhãn `target_return_10d, target_class, max_high_next_10d, min_low_next_10d`).
 - [ ] Tách dữ liệu theo cột `split`:
   - `train_df = df[df['split'] == 'train']`
   - `val_df = df[df['split'] == 'validation']`
