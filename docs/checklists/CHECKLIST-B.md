@@ -8,9 +8,16 @@
 
 ## 1. Các File Bạn Sở Hữu (Chỉ mình bạn code vào các file này)
 
-1. `src/features.py` — Module tích hợp 3 bảng từ `data/raw/`, xử lý khuyết thiếu/ngoại lai và sinh 25+ chỉ báo kỹ thuật + nhãn dự báo.
-2. `src/eda_graph.py` — Module chạy phân cụm không giám sát (`PCA` + `KMeans`) và phân tích mạng lưới tương quan cổ phiếu (`networkx` + `PageRank`).
-3. `notebooks/02_eda_and_graph.ipynb` — Notebook trình bày toàn bộ thống kê mô tả, biểu đồ EDA, mặt phẳng phân cụm PCA và đồ thị mạng lưới VN30 để đưa vào Chương 2 & Chương 3 của Báo cáo PDF.
+1. `src/processing/` (chia module `< 130` dòng/file, export `build_feature_dataset` và `run_eda_and_graph_analysis` tại `__init__.py`):
+   - `loader.py` — Đọc & tích hợp 3 bảng từ `data/raw/`, điền khuyết `ffill()`.
+   - `indicators.py` — Tính 25+ chỉ báo kỹ thuật thuần Pandas/NumPy (gồm cả bản chuẩn hóa `%` không đơn vị).
+   - `labels.py` — Tạo nhãn dự báo 10 phiên, cửa sổ T+2.5 (`t+3 → t+10`) & chia Temporal Split.
+   - `pca_clustering.py` — Phân cụm không giám sát (`StandardScaler` + `PCA` + `KMeans`) trên `<= 2024-12-31`.
+   - `graph_pagerank.py` — Đồ thị tương quan (`networkx` + `PageRank`) trên `<= 2024-12-31`.
+   - `cli.py` — Chạy độc lập qua `uv run python -m src.processing.cli`.
+2. `tests/test_processing.py` — Unit tests công thức chỉ báo/nhãn & Data Contract tests khớp 100% `API_CONTRACTS.md`.
+3. `notebooks/02_eda_and_graph.ipynb` — Notebook trình bày thống kê mô tả, biểu đồ EDA, mặt phẳng phân cụm PCA và đồ thị mạng lưới VN30 để đưa vào Chương 2 & Chương 3 của Báo cáo PDF.
+4. `docs/modules/02-processing.md` — Tài liệu kỹ thuật chi tiết của phân hệ.
 
 ---
 
@@ -25,7 +32,8 @@
 
 ## 3. Lộ Trình Các Bước Thực Hiện Chi Tiết (Step-by-Step Checklist)
 
-### Bước 1: Viết `src/features.py` tạo `data/processed/features_all.parquet`
+### Bước 1: Xây dựng `src/processing/{loader,indicators,labels}.py` tạo `data/processed/features_all.parquet`
+- [ ] **Điều kiện tiền đề (Step 0 - Ingestion)**: Đảm bảo `data/raw/news_sentiment.parquet` đã được backfill tin CafeF giai đoạn `2019–2024` (dừng sớm khi `pub_date < 2019-01-01`) để tập `train` không bị toàn bộ `sentiment_score = 0`.
 - [ ] **Tích hợp dữ liệu (Data Integration - Bài L3)**:
   - Đọc `prices.parquet`, `news_sentiment.parquet`, `macro.parquet` từ `data/raw/`.
   - Lọc bảng `prices` giữ lại 30 mã cổ phiếu trong `VN30_TICKERS`.
@@ -33,30 +41,32 @@
   - Left-join tiếp với `news_sentiment` theo `(date, ticker)`. Những ngày không có tin tức của mã đó thì điền `sentiment_score = 0.0` và `news_count = 0`.
 - [ ] **Làm sạch & Xử lý Ngoại lai (Data Cleaning - Bài L3)**:
   - Sắp xếp đúng thứ tự `['ticker', 'date']`.
+  - Chuẩn hóa vector OHLC toàn bảng: `high = max(open, high, low, close)` và `low = min(open, high, low, close)` (không sửa `open`/`close`, chỉ nắn tự động các dòng lệch nguồn lịch sử 2019–2020 để tránh `Stochastic`/`ATR` vượt biên), và bảo vệ chia cho `0` bằng `eps = 1e-8` khi `high == low` hoặc `vol_sma_20 == 0`.
   - Điền khuyết cho các cột vĩ mô/giá bằng `groupby('ticker').ffill()` (**Tuyệt đối không dùng `bfill()`** để tránh rò rỉ dữ liệu tương lai).
-  - Tính lợi nhuận ngày `return_1d` và dùng phương pháp **IQR Clipping** (hoặc cắt ngưỡng biên độ sàn HOSE $\pm 7\%$) để khử các điểm dị biệt (Outliers).
-- [ ] **Kỹ nghệ Đặc trưng (Feature Engineering — 25+ biến)**:
+  - Giữ nguyên toàn bộ lịch sử `2019–2026` (không xóa 70 phiên HNX/UPCOM 2019–2021 để bảo toàn chuỗi thời gian). Chỉ **clip an toàn feature `return_1d` ở ngưỡng `±15%`** (không sửa `close` và `target_return_10d`).
+- [ ] **Kỹ nghệ Đặc trưng (Feature Engineering — 25+ biến, ưu tiên tỷ lệ `%` không đơn vị theo `sma-zoomcamp`)**:
   - Tính theo từng `ticker` (`groupby('ticker')`):
     - **Lag Returns**: `return_1d`, `return_3d`, `return_5d`, `return_10d`, `return_20d`, `return_60d`.
-    - **Trend (khớp Paper Nature 2024)**: `sma_10`, `sma_20`, `sma_50`, `ema_12`, `ema_26`, `price_to_sma20 = close / sma_20 - 1`, `sma10_to_sma50 = sma_10 / sma_50 - 1`, `macd = ema_12 - ema_26`, `macd_signal = macd.ewm(span=9).mean()`, `macd_hist = macd - macd_signal`.
-    - **Momentum & Volatility**: `rsi_14`, `stoch_k`, `stoch_d`, `bb_upper_ratio`, `bb_lower_ratio`, `bb_width`, `atr_14`, `natr_14 = atr_14 / close`, `volatility_10d`, `volatility_20d`.
-    - **Volume & Flow**: `ln_volume = np.log(volume + 1.0)`, `volume_to_sma20`, `obv_slope_5d`.
+    - **Trend (khớp Paper Nature 2024 + chuẩn hóa `%`)**: `sma_10`, `sma_20`, `sma_50`, `ema_12`, `ema_26`, `price_to_sma20 = close / sma_20 - 1`, `sma10_to_sma50 = sma_10 / sma_50 - 1`, `macd = ema_12 - ema_26`, `macd_signal = macd.ewm(span=9).mean()`, `macd_hist = macd - macd_signal`, `macd_norm = macd / close`, `macd_hist_norm = macd_hist / close`.
+    - **Momentum & Volatility**: `rsi_14`, `stoch_k`, `stoch_d`, `bb_upper_ratio = (close - bb_upper) / close`, `bb_lower_ratio = (close - bb_lower) / close`, `bb_width = (bb_upper - bb_lower) / sma_20`, `atr_14`, `natr_14 = atr_14 / close`, `volatility_10d`, `volatility_20d`.
+    - **Volume & Flow**: `ln_volume = np.log(volume + 1.0)`, `volume_to_sma20 = volume / vol_sma_20`, `obv_slope_5d`.
     - **Sentiment & Macro**: `sentiment_ma5` (trung bình trượt 5 phiên của `sentiment_score`), `vnindex_return_10d`, `relative_strength_vs_vnindex = return_10d - vnindex_return_10d`.
     - **Seasonality (khớp Paper PLOS ONE 2025)**: `month`, `weekday`, `quarter`.
 - [ ] **Tạo Nhãn Dự báo (Targets) & Chia Tập (`split`)**:
   - `target_return_10d = groupby('ticker')['close'].shift(-10) / close - 1`.
   - `target_class = (target_return_10d > 0.015).astype('int32')`.
   - `max_high_next_10d` và `min_low_next_10d`: Giá cao nhất / thấp nhất trong cửa sổ từ `t+3` đến `t+10` (sau khi cổ phiếu về tài khoản theo chu kỳ T+2.5).
-  - Gán cột `split`: `"train"` nếu `date <= "2023-12-31"`, `"validation"` nếu `"2024-01-01" <= date <= "2024-12-31"`, `"test"` nếu `date >= "2025-01-01"`.
-  - Loại bỏ các dòng đầu/cuối bị `NaN` do cửa sổ trượt, lưu ra `data/processed/features_all.parquet`.
+  - Gán cột `split`: `"train"` nếu `date <= "2023-12-31"`, `"validation"` nếu `"2024-01-01" <= date <= "2024-12-31"`, `"test"` nếu `date >= "2025-01-01"` và có nhãn `target_return_10d`, còn **10 phiên cuối cùng chưa có nhãn `target_return_10d`** gán `split = "live"` (giữ `target_* = NaN` để Phần 3 dự báo tín hiệu mới nhất cho Tab 5).
+  - Chỉ `dropna()` trên các cột feature (bỏ 60 phiên đầu 2019), lưu ra `data/processed/features_all.parquet`.
 
-### Bước 2: Viết `src/eda_graph.py` tạo `clusters_pca.csv` và `graph_pagerank.csv`
+### Bước 2: Xây dựng `src/processing/{pca_clustering,graph_pagerank}.py` tạo `clusters_pca.csv` và `graph_pagerank.csv`
+- [ ] **Chống Look-ahead Bias bắt buộc**: Chỉ lọc dữ liệu lịch sử `split in ("train", "validation")` (`date <= "2024-12-31"`) trước khi tính PCA/K-Means và PageRank (tuyệt đối không dùng tập `test 2025–2026`).
 - [ ] **Phân cụm K-Means & Giảm chiều PCA (Bài L4)**:
-  - Trên tập dữ liệu lịch sử, tính cho mỗi mã trong 30 mã VN30: Lợi nhuận trung bình năm (`mean_annual_return`), Độ biến động năm (`annual_volatility`), Tỷ số Sharpe (`sharpe_hist`), Beta so với VN-Index, và Thanh khoản trung bình.
+  - Trên tập `train + validation`, tính cho mỗi mã trong 30 mã VN30: Lợi nhuận trung bình năm (`mean_annual_return`), Độ biến động năm (`annual_volatility`), Tỷ số Sharpe (`sharpe_hist`, dùng `sbv_policy_rate`), Beta so với VN-Index, và Thanh khoản trung bình.
   - Chuẩn hóa bằng `StandardScaler`, chiếu xuống 2 chiều `pca_1`, `pca_2` bằng `PCA(n_components=2, random_state=42)`.
   - Phân thành 4 cụm bằng `KMeans(n_clusters=4, random_state=42)` và lưu ra `data/processed/clusters_pca.csv`.
 - [ ] **Phân tích Liên kết Đồ thị — Link Analysis & PageRank (Bài L10–11)**:
-  - Lập ma trận tương quan Pearson $30 \times 30$ giữa lợi nhuận ngày (`return_1d`) của 30 mã VN30.
+  - Trên tập `train + validation`, lập ma trận tương quan Pearson $30 \times 30$ giữa lợi nhuận ngày (`return_1d`) của 30 mã VN30.
   - Khởi tạo đồ thị vô hướng `G = nx.Graph()`. Thêm cạnh `(u, v, weight=corr)` nếu hai mã $u \neq v$ có hệ số tương quan `corr >= 0.60`.
   - Chạy thuật toán `nx.pagerank(G, weight='weight')` và `nx.degree_centrality(G)` để tìm ra các cổ phiếu có sức lan tỏa lớn nhất rổ VN30.
   - Lưu bảng xếp hạng ra `data/processed/graph_pagerank.csv`.
@@ -74,8 +84,11 @@
 python -c "
 import pandas as pd
 df = pd.read_parquet('data/processed/features_all.parquet')
-assert set(df['split'].unique()) == {'train', 'validation', 'test'}
-assert df.isna().sum().sum() == 0, 'Still contains NaN values!'
+assert set(df['split'].unique()) == {'train', 'validation', 'test', 'live'}
+target_cols = ['target_return_10d', 'target_class', 'max_high_next_10d', 'min_low_next_10d']
+feature_cols = [c for c in df.columns if c not in target_cols]
+assert df[feature_cols].isna().sum().sum() == 0, 'Feature columns still contain NaN!'
+assert df[df['split'] != 'live'][target_cols].isna().sum().sum() == 0, 'Labeled splits contain NaN targets!'
 print('OK features_all.parquet:', df.shape)
 print('OK clusters_pca.csv:', pd.read_csv('data/processed/clusters_pca.csv').shape)
 print('OK graph_pagerank.csv:', pd.read_csv('data/processed/graph_pagerank.csv').shape)

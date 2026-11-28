@@ -95,4 +95,8 @@ Bất kỳ Agent hay thành viên nào khi triển khai một phân hệ (`inges
   1. `feat(<module>): ...` (implement core logic files)
   2. `test(<module>): add pytest unit and schema contract tests`
   3. `docs(<module>): add executed notebook and technical module documentation`
-- Luôn chạy `uv run pytest` và `git status` kiểm tra working tree sạch sẽ trước và sau khi commit.
+- Luôn chạy kiểm tra chất lượng code & test trước và sau mỗi lần sửa code / commit:
+  - `ruff check src/ tests/` (0 lỗi lint/import/exception)
+  - `uvx ty check --python .venv src/ tests/` (hoặc `ty check` với môi trường `.venv` để đảm bảo 0 lỗi type/import)
+  - `uv run pytest -v` (PASS 100%)
+  - `git status` (working tree sạch sẽ)

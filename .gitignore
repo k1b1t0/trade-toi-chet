@@ -15,5 +15,6 @@ __pycache__/
 
 # Model weights & temporary caches
 models/*.pkl
+data/tradetoichet.db
 *.tmp
 *.log
