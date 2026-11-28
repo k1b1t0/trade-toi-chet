@@ -24,11 +24,11 @@ BENCHMARK_TICKER = "VNINDEX"
 
 # Khoảng thời gian lấy dữ liệu & Mốc chia Temporal Split (Chống Look-ahead Bias)
 START_DATE = "2019-01-01"
-END_DATE = "2026-03-01"
+END_DATE = "2026-11-20"
 
-TRAIN_END_DATE = "2023-12-31"   # ~70% dữ liệu: 2019 - 2023
-VAL_END_DATE   = "2024-12-31"   # ~15% dữ liệu: năm 2024
-# Tập Test: từ "2025-01-01" trở đi (~15% dữ liệu)
+TRAIN_END_DATE = "2023-12-31"   # ~63% dữ liệu: 2019 - 2023 (purge 10 phiên cuối trước khi fit)
+VAL_END_DATE   = "2024-12-31"   # ~13% dữ liệu: năm 2024 (dùng để tune model & chọn ngưỡng xác suất)
+# Tập Test: từ "2025-01-01" trở đi (~24% dữ liệu — khóa kín để đánh giá cuối cùng)
 
 # Tham số thị trường chứng khoán Việt Nam (dùng cho nhãn & Backtest)
 HOLDING_DAYS = 10               # Chu kỳ dự báo & nắm giữ cơ sở: 10 phiên giao dịch (~2 tuần)
@@ -127,32 +127,32 @@ Chứa toàn bộ các dòng của tập `"validation"` và `"test"` từ `featu
 | `proba_dt` | `float64` | Xác suất `target_class == 1` `[0.0, 1.0]` của Decision Tree (`max_depth=10`). |
 | `proba_rf` | `float64` | Xác suất `target_class == 1` `[0.0, 1.0]` của Random Forest (`n_estimators=100, max_depth=13`). |
 | `proba_lgbm` | `float64` | Xác suất `target_class == 1` `[0.0, 1.0]` của LightGBM Classifier. |
-| `proba_lstm_sota` | `float64` | Xác suất `target_class == 1` `[0.0, 1.0]` của mạng chuỗi thời gian LSTM/MLP (Đối sánh Paper Nature 2024). |
+| `proba_mlp_sota` | `float64` | Xác suất `target_class == 1` `[0.0, 1.0]` của mạng nơ-ron `MLPClassifier` (Đối sánh nhánh Neural Net của Paper PLOS ONE 2025). |
 
 ### 4.2. File `data/processed/sota_benchmark.csv`
 Bảng tổng hợp kết quả đánh giá mô hình trên tập Test để hiển thị lên Tab 3 của Streamlit và đưa thẳng vào Báo cáo PDF.
 - **Các cột**:
-  `model_name`, `task_type` (`"Regression"` hoặc `"Classification"`), `paper_reference` (VD: `"Baseline (L7)"`, `"PLOS ONE 2025 SOTA"`, `"Nature 2024 SOTA"`), `rmse`, `mae`, `mape`, `r2`, `accuracy`, `precision_at_50`, `precision_at_55`, `recall_at_55`, `f1_at_55`, `roc_auc`, `train_time_sec`.
+  `model_name`, `task_type` (`"Regression"` hoặc `"Classification"`), `paper_reference` (VD: `"Baseline (L7)"`, `"PLOS ONE 2025 SOTA"`), `rmse`, `mae`, `smape`, `r2`, `accuracy`, `precision_at_50`, `precision_at_55`, `recall_at_55`, `f1_at_55`, `roc_auc`, `train_time_sec`.
 
 ### 4.3. File `data/processed/feature_importance.csv`
-- **Các cột**: `feature_name`, `importance_rf`, `importance_lgbm`, `feature_group` (`"Technical"`, `"Macro"`, `"Sentiment"`, `"LagReturn"`).
+- **Các cột**: `feature_name`, `importance_rf`, `importance_lgbm`, `feature_group` (`"Technical"`, `"Macro"`, `"Sentiment"`, `"LagReturn"`, `"Volume"`, `"Seasonality"`).
 
 ---
 
 ## 5. Hợp Đồng Bảng Dữ Liệu — Tầng 4: `data/processed/` (Output của Người D $\to$ Input của Người E)
 
 ### 5.1. File `data/processed/threshold_tuning.csv`
-Kết quả quét ngưỡng xác suất từ `0.50` đến `0.70` (bước nhảy `0.02`) cho mô hình tốt nhất (`proba_rf` và `proba_lgbm`).
+Kết quả quét ngưỡng xác suất trên **`split == "validation"` (2024)** từ `0.50` đến `0.70` (bước nhảy `0.02`) cho mô hình tốt nhất (`proba_rf` và `proba_lgbm`) để chọn ngưỡng tối ưu $\tau^*$ (khóa cứng trước khi đánh giá trên `test`).
 - **Các cột**: `model_col`, `threshold`, `total_trades`, `avg_trades_per_day`, `precision`, `win_rate`, `net_return_pct`, `cagr`, `sharpe_ratio`, `max_drawdown_pct`.
 
 ### 5.2. File `data/processed/backtest_summary.csv`
-Bảng so sánh hiệu quả tài chính trên tập Test giữa 6 chiến lược (gồm thêm Baseline gửi tiết kiệm theo lãi suất SBV).
+Bảng so sánh hiệu quả tài chính trên tập Test (`>= 2025-01-01`, khớp mua ở `open_{t+1}`, giữ tối thiểu `T+3` xấp xỉ bảo thủ T+2.5, đọc `sbv_policy_rate` từ `macro.parquet` và OHLC từ `prices.parquet`) giữa 6 chiến lược:
 - **Các cột**:
-  `strategy_id`, `strategy_name` (VD: `"Savings Benchmark (SBV Policy Rate)"`, `"Buy & Hold VN-Index"`, `"Equal-Weight VN30"`, `"Random Forest (Threshold 0.55)"`, `"LightGBM Top-3 + T+2.5 StopLoss/TakeProfit"`, `"LSTM SOTA (Nature 2024)"`), `initial_capital_vnd`, `final_capital_vnd`, `total_return_pct`, `cagr_pct`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown_pct`, `total_trades`, `win_rate_pct`, `total_fees_and_tax_vnd`.
+  `strategy_id`, `strategy_name` (VD: `"Savings Benchmark (SBV Policy Rate)"`, `"Buy & Hold VN-Index"`, `"Equal-Weight VN30"`, `"Random Forest (Val-Tuned Threshold)"`, `"LightGBM Top-3 + T+3 StopLoss/TakeProfit"`, `"MLP Neural Net (PLOS ONE 2025)"`), `initial_capital_vnd`, `final_capital_vnd`, `total_return_pct`, `cagr_pct`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown_pct`, `total_trades`, `win_rate_pct`, `total_fees_and_tax_vnd`.
 
 ### 5.3. File `data/processed/equity_curve.parquet`
 Chuỗi giá trị tài sản theo từng ngày trên tập Test để vẽ biểu đồ đường cong vốn (Equity Curve & Underwater Drawdown Chart).
-- **Các cột**: `date`, `sbv_savings_nav`, `vnindex_nav`, `rf_rule55_nav`, `lgbm_top3_nav`, `lstm_sota_nav`, `lgbm_drawdown_pct`, `vnindex_drawdown_pct`.
+- **Các cột**: `date`, `sbv_savings_nav`, `vnindex_nav`, `rf_rule_nav`, `lgbm_top3_nav`, `mlp_sota_nav`, `lgbm_drawdown_pct`, `vnindex_drawdown_pct`.
 
 ---
 

@@ -41,6 +41,7 @@
   - Left-join tiếp với `news_sentiment` theo `(date, ticker)`. Những ngày không có tin tức của mã đó thì điền `sentiment_score = 0.0` và `news_count = 0`.
 - [ ] **Làm sạch & Xử lý Ngoại lai (Data Cleaning - Bài L3)**:
   - Sắp xếp đúng thứ tự `['ticker', 'date']`.
+  - Chuẩn hóa vector OHLC toàn bảng: `high = max(open, high, low, close)` và `low = min(open, high, low, close)` (không sửa `open`/`close`, chỉ nắn tự động các dòng lệch nguồn lịch sử 2019–2020 để tránh `Stochastic`/`ATR` vượt biên), và bảo vệ chia cho `0` bằng `eps = 1e-8` khi `high == low` hoặc `vol_sma_20 == 0`.
   - Điền khuyết cho các cột vĩ mô/giá bằng `groupby('ticker').ffill()` (**Tuyệt đối không dùng `bfill()`** để tránh rò rỉ dữ liệu tương lai).
   - Giữ nguyên toàn bộ lịch sử `2019–2026` (không xóa 70 phiên HNX/UPCOM 2019–2021 để bảo toàn chuỗi thời gian). Chỉ **clip an toàn feature `return_1d` ở ngưỡng `±15%`** (không sửa `close` và `target_return_10d`).
 - [ ] **Kỹ nghệ Đặc trưng (Feature Engineering — 25+ biến, ưu tiên tỷ lệ `%` không đơn vị theo `sma-zoomcamp`)**:

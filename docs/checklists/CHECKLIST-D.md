@@ -32,33 +32,31 @@
 
 ## 3. Lộ Trình Các Bước Thực Hiện Chi Tiết (Step-by-Step Checklist)
 
-### Bước 1: Viết Hàm Quét Ngưỡng Xác Suất (`Threshold Tuning` — Kế thừa Module 4)
-- [ ] Đọc `data/processed/predictions.parquet` và lọc lấy tập `split == "test"`.
+### Bước 1: Viết Hàm Quét Ngưỡng Xác Suất (`Threshold Tuning` trên tập `validation` — 0% Data Leak)
+- [ ] Đọc `data/processed/predictions.parquet` và lọc lấy tập **`split == "validation"` (2024)** để quét chọn ngưỡng tối ưu $\tau^*$ (tuyệt đối không tune trên `test`).
 - [ ] Với 2 mô hình chính (`proba_rf` và `proba_lgbm`), quét ngưỡng xác suất $\tau \in [0.50, 0.52, 0.54, \dots, 0.70]$:
-  - Tại mỗi ngưỡng $\tau$, xác định các lệnh mua khi `proba >= tau`.
+  - Tại mỗi ngưỡng $\tau$, xác định các lệnh mua khi `proba >= tau` (khớp mua ở **`open_{t+1}`** của phiên kế tiếp).
   - Tính:
     - Tổng số lệnh (`total_trades`) và Số lệnh trung bình mỗi ngày (`avg_trades_per_day`).
     - Độ chuẩn (`precision`: tỷ lệ lệnh đạt lợi nhuận $> +1.5\%$) và Tỷ lệ thắng sau phí (`win_rate`: tỷ lệ lệnh có lợi nhuận ròng sau khi trừ $0.40\%$ phí/thuế $> 0$).
     - Lợi nhuận ròng và chỉ số `CAGR` theo mô phỏng vốn cố định (Fixed Capital Simulation giống Module 4).
-- [ ] Lưu bảng kết quả quét ngưỡng ra `data/processed/threshold_tuning.csv`.
+- [ ] Lưu bảng kết quả quét ngưỡng ra `data/processed/threshold_tuning.csv` và khóa ngưỡng tối ưu $\tau^*$ để chạy ở Bước 2 trên tập `test`.
 
-### Bước 2: Viết Engine Mô Phỏng Danh Mục Nâng Cao Chuẩn T+2.5 Việt Nam (Kế thừa Module 5)
-- [ ] Thiết lập vốn khởi đầu chuẩn: `initial_capital_vnd = 100_000_000` (100 triệu VNĐ).
-- [ ] Thực hiện mô phỏng so sánh **6 Chiến lược** trên tập Test:
-  1. **`Savings Benchmark (SBV Policy Rate)` (Benchmark 0 — Gửi tiết kiệm phi rủi ro)**: Lãi kép theo từng phiên giao dịch từ `sbv_policy_rate` ($r_{f,\text{daily}} = (1 + r_{\text{annual}})^{1/252} - 1$), Drawdown = `0%`, xuất cột `sbv_savings_nav` để kiểm chứng chiến lược AI có thắng gửi tiết kiệm không.
-  2. **`Buy & Hold VN-Index` (Benchmark 1)**: Mua và nắm giữ chỉ số thị trường chung từ đầu đến cuối kỳ Test.
-  3. **`Equal-Weight VN30` (Benchmark 2)**: Phân bổ đều vào 30 mã VN30.
-  4. **`Random Forest (Rule Threshold >= 0.55)`**: Mua các mã có `proba_rf >= 0.55`, giữ cố định 10 phiên, trừ phí & thuế `0.40%`.
-  5. **`LSTM SOTA (Paper Nature 2024)`**: Mua theo tín hiệu của `proba_lstm_sota >= 0.55`, trừ phí & thuế `0.40%`.
-  6. **`LightGBM Top-3 + Quản trị rủi ro T+2.5` (Chiến lược Đề xuất của Nhóm)**:
-     - Mỗi ngày, lọc các mã có `proba_lgbm >= 0.55`, xếp hạng giảm dần và chỉ chọn tối đa **Top 3 mã có xác suất cao nhất** (Lazy Optimization từ Module 5).
-     - **Áp dụng quy tắc T+2.5 & Stop-loss / Take-profit (thận trọng)**:
-       - Trong 2 ngày đầu (`t+1, t+2`), hàng chưa về tài khoản nên không thể bán.
-       - Từ ngày `t+3` đến `t+10` (quét tuần tự từng phiên từ `prices.parquet`, hoặc nếu dùng `min_low_next_10d` & `max_high_next_10d` và cả hai cùng chạm ngưỡng thì **ưu tiên tính Stop-loss trước** để đảm bảo thận trọng):
-         - Nếu giá chạm ngưỡng cắt lỗ `-7%` (`Stop-loss`) $\to$ đóng lệnh tại `-7%` trừ phí `0.40%`.
-         - Nếu giá chạm ngưỡng chốt lời sớm `+15%` (`Take-profit`) $\to$ đóng lệnh tại `+15%` trừ phí `0.40%`.
-         - Ngược lại $\to$ đóng lệnh vào cuối phiên `t+10` với `target_return_10d` trừ phí `0.40%`.
-     - **Tái đầu tư lãi kép (Compounding)**: Cập nhật giá trị tài sản ròng (`NAV`) theo từng ngày giao dịch.
+### Bước 2: Viết Engine Mô Phỏng Danh Mục Chuẩn T+3 (Xấp xỉ bảo thủ T+2.5) & Export `simulate_strategy()`
+- [ ] Thiết lập vốn khởi đầu chuẩn: `initial_capital_vnd = 100_000_000` (100 triệu VNĐ), giới hạn tối đa **10 vị thế mở cùng lúc** (bỏ qua lô 100 & trần/sàn để giữ engine gọn). Đọc `sbv_policy_rate` trực tiếp từ `data/raw/macro.parquet` và giá OHLC từng phiên từ `data/raw/prices.parquet`.
+- [ ] Export 1 hàm dùng chung `simulate_strategy(...)` tại `src/backtesting/` để cả CLI và Tab 4 Streamlit slider cùng gọi.
+- [ ] Thực hiện mô phỏng so sánh **6 Chiến lược** trên tập **`split == "test"` (`>= 2025-01-01`)** với giá khớp mua tại **`open_{t+1}`**:
+  1. **`Savings Benchmark (SBV Policy Rate)`**: Lãi kép theo từng phiên từ `sbv_policy_rate` trong `macro.parquet` ($r_{f,\text{daily}} = (1 + r_{\text{annual}})^{1/252} - 1$), Drawdown = `0%`.
+  2. **`Buy & Hold VN-Index`**: Mua và nắm giữ chỉ số thị trường chung từ đầu đến cuối kỳ Test.
+  3. **`Equal-Weight VN30`**: Phân bổ đều vào 30 mã VN30.
+  4. **`Random Forest (Val-Tuned Threshold)`**: Mua các mã có `proba_rf >= tau*`, giữ cố định 10 phiên, trừ phí & thuế `0.40%`.
+  5. **`MLP Neural Net (PLOS ONE 2025)`**: Mua theo tín hiệu `proba_mlp_sota >= tau*`, trừ phí & thuế `0.40%`.
+  6. **`Best-Model Top-3 + Quản trị rủi ro T+3` (Chiến lược Đề xuất — chọn động model quán quân theo kết quả `Validation 2024`, thường là `LightGBM` hoặc `Random Forest`)**:
+     - Mỗi ngày `T`, lọc các mã có `proba_best >= tau*`, chọn tối đa **Top 3 mã xác suất cao nhất** (không vượt quá 10 slot đang mở), khớp mua ở **`open_{t+1}`**.
+     - **Quy tắc nắm giữ tối thiểu `T+3` (xấp xỉ bảo thủ cho luật T+2.5 của HOSE do dữ liệu chỉ có nến ngày) & Stop-loss/Take-profit**:
+       - Khóa không bán trong 2 phiên đầu sau khi mua; từ phiên thứ 3 đến phiên thứ 10, quét tuần tự từng phiên theo `prices.parquet` (nếu mở cửa gap down quá `-7%` thì cắt lỗ theo đúng giá `open` thực tế; nếu chạm cả SL `-7%` và TP `+15%` trong cùng 1 phiên thì ưu tiên tính Stop-loss trước để thận trọng).
+       - Hết phiên thứ 10 chưa chạm SL/TP $\to$ đóng lệnh theo giá `close`, trừ phí & thuế `0.40%`.
+     - **Tái đầu tư lãi kép (Compounding)**: Cập nhật `NAV` theo từng ngày giao dịch.
 
 ### Bước 3: Xuất Bảng Tổng Hợp & Đường Cong Vốn Cho Người E
 - [ ] Xuất bảng so sánh 5 chiến lược ra `data/processed/backtest_summary.csv`.

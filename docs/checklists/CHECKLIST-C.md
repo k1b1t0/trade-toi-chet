@@ -23,10 +23,9 @@
   - `DecisionTreeClassifier(max_depth=10, random_state=42)`
   - `RandomForestRegressor(n_estimators=100, max_depth=12, random_state=42, n_jobs=-1)`
   - `RandomForestClassifier(n_estimators=100, max_depth=13, random_state=42, n_jobs=-1)`
-- **Mô hình Boosting SOTA (Đối sánh Paper PLOS ONE 2025)**:
-  - `lightgbm.LGBMRegressor` & `lightgbm.LGBMClassifier` (hoặc `xgboost` / `HistGradientBoosting` của scikit-learn — chạy cực nhanh trên CPU trong 2 giây).
-- **Mô hình Chuỗi thời gian SOTA (Đối sánh Paper Nature 2024)**:
-  - Một mạng `PyTorch LSTM` nhẹ (hoặc `MLPClassifier(hidden_layer_sizes=(30, 40, 50, 60), max_iter=200, early_stopping=True, random_state=42)` mô phỏng đúng kiến trúc 4 tầng ẩn `30-40-50-60 units, ReLU, EarlyStopping` trong Fig. 3 trang 5 của bài báo Nature 2024 — chạy trên CPU chỉ mất ~5 giây, không cần GPU!).
+- **Mô hình Boosting & Neural SOTA (Đối sánh 1 Paper chính: PLOS ONE 2025 — không cần cài PyTorch/XGBoost)**:
+  - `lightgbm.LGBMRegressor` & `lightgbm.LGBMClassifier` (đại diện họ Gradient Boosted Trees quán quân trong bài báo PLOS ONE 2025).
+  - `MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=200, early_stopping=True, random_state=42)` (đại diện nhánh Neural Net trong bài báo PLOS ONE 2025, chạy thuần `scikit-learn` trên CPU).
 
 ---
 
@@ -35,12 +34,11 @@
 ### Bước 1: Chuẩn bị Tập Đặc trưng & Chia Temporal Split (Chống Look-ahead Bias)
 - [ ] Đọc `data/processed/features_all.parquet`.
 - [ ] Định nghĩa danh sách các cột `FEATURE_COLS` (chỉ dùng các chỉ báo **tỷ lệ `%` không đơn vị / đã chuẩn hóa** theo chuẩn `sma-zoomcamp`; loại bỏ các cột định danh `date, ticker, sector, split`, giá thô & chỉ báo đơn vị VNĐ tuyệt đối `open, high, low, close, volume, sma_10, sma_20, sma_50, ema_12, ema_26, atr_14, macd, macd_signal, macd_hist`, và các cột nhãn `target_return_10d, target_class, max_high_next_10d, min_low_next_10d`).
-- [ ] Tách dữ liệu theo cột `split`:
-  - `train_df = df[df['split'] == 'train']`
-  - `val_df = df[df['split'] == 'validation']`
-  - `test_df = df[df['split'] == 'test']`
-  - `train_val_df = df[df['split'].isin(['train', 'validation'])]` (Dùng để fit mô hình cuối cùng trước khi đánh giá trên `test_df`, đúng chuẩn SMA Zoomcamp Module 3 & 4).
-- [ ] Fit `SimpleImputer` và `StandardScaler` **chỉ trên tập Train**, sau đó `.transform()` cho tập Validation và Test.
+- [ ] Tách dữ liệu theo cột `split` theo **quy trình 1-Pass + Purge 10 phiên cuối `train`** (0% data leak, gọn đúng chuẩn `sma-zoomcamp`):
+  - `train_df = df[df['split'] == 'train']` → **Purge bỏ 10 phiên cuối cùng của mỗi mã trong `train_df`** (vì nhãn `target_return_10d` của 10 phiên cuối 2023 dùng giá đầu 01/2024 của tập Validation).
+  - `val_df = df[df['split'] == 'validation']` (2024 — dùng để so sánh và cho Phần 4 quét chọn ngưỡng $\tau^*$).
+  - `test_df = df[df['split'] == 'test']` (2025–2026 — khóa kín, chỉ dự báo đánh giá cuối cùng).
+- [ ] Fit `SimpleImputer`, `StandardScaler` và toàn bộ mô hình **chỉ 1 lần trên `train_df` đã purge**, sau đó `.transform()` & `.predict()` ra cả `val_df` và `test_df`.
 
 ### Bước 2: Huấn luyện Nhánh 1 — Dự báo Lợi nhuận (`Regression` — Đối sánh Paper PLOS ONE 2025)
 - [ ] Nhãn mục tiêu: `y_reg = target_return_10d`.
@@ -49,16 +47,16 @@
   2. `RandomForestRegressor` (tương ứng mô hình `RF` trong Paper PLOS ONE 2025).
   3. `LGBMRegressor` / `HistGradientBoostingRegressor` (tương ứng mô hình quán quân `F-DEA-GBT` trong Paper PLOS ONE 2025).
 - [ ] Dự báo trên tập Validation & Test, lưu vào 3 cột: `pred_reg_linear`, `pred_reg_rf`, `pred_reg_lgbm`.
-- [ ] Tính bộ chỉ số trên tập Test: `RMSE`, `MAE`, `MAPE`, `R2` và hệ số tương quan Pearson giữa lợi nhuận dự báo và thực tế.
+- [ ] Tính bộ chỉ số trên tập Test: `RMSE`, `MAE`, `sMAPE` (tránh chia cho 0 khi `target_return_10d == 0`), `R2` và hệ số tương quan Pearson giữa lợi nhuận dự báo và thực tế.
 
-### Bước 3: Huấn luyện Nhánh 2 — Phân loại Xu hướng (`Classification & SOTA` — Đối sánh Paper Nature 2024)
+### Bước 3: Huấn luyện Nhánh 2 — Phân loại Xu hướng (`Classification & SOTA` — Đối sánh Paper PLOS ONE 2025)
 - [ ] Nhãn mục tiêu: `y_clf = target_class` (`1` nếu lợi nhuận 10 phiên $> +1.5\%$, ngược lại `0`).
 - [ ] Huấn luyện 5 mô hình và trích xuất xác suất Lớp 1 bằng `.predict_proba(X)[:, 1]`:
   1. `LogisticRegression` $\to$ lưu cột `proba_logistic`.
   2. `DecisionTreeClassifier(max_depth=10)` $\to$ lưu cột `proba_dt`.
   3. `RandomForestClassifier(n_estimators=100, max_depth=13)` $\to$ lưu cột `proba_rf`.
   4. `LGBMClassifier(n_estimators=150, max_depth=8, learning_rate=0.05)` $\to$ lưu cột `proba_lgbm`.
-  5. **Mô hình SOTA theo Paper Nature (2024)**: Kiến trúc 4 tầng ẩn `(30, 40, 50, 60)` với `ReLU` & `EarlyStopping` $\to$ lưu cột `proba_lstm_sota`.
+  5. `MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=200, early_stopping=True)` $\to$ lưu cột `proba_mlp_sota`.
 - [ ] Tính bộ chỉ số trên tập Test cho cả 5 mô hình:
   - `Accuracy`
   - `Precision @ threshold 0.50` và `Precision @ threshold 0.55`
