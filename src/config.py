@@ -12,6 +12,7 @@ DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
 DATA_MODELS_DIR = DATA_DIR / "models"
 SENTIMENT_MODEL_PATH = DATA_MODELS_DIR / "sentiment_tfidf.joblib"
+SENTIMENT_LABELS_PATH = DATA_RAW_DIR / "sentiment_labels.parquet"
 SQLITE_DB_PATH = DATA_DIR / "tradetoichet.db"
 
 # danh sach 30 ma co phieu trong ro vn30 va chi so vnindex
