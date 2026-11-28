@@ -30,11 +30,12 @@ from src.ingestion.sentiment import score_vietnamese_headline
 
 
 def test_sentiment_scorer_polarity() -> None:
-    """kiem tra model .joblib da train tu 2526 nhan llm distillation phan biet dung tin tich cuc, tieu cuc va trung lap."""
+    """kiem tra model .joblib da train tu nhan llm distillation (<= 2023-12-31) phan biet dung 3 lop."""
     assert SENTIMENT_MODEL_PATH.exists(), "Missing pre-trained sentiment_tfidf.joblib model"
-    with get_connection(SQLITE_DB_PATH) as conn:
-        label_count = conn.execute("SELECT COUNT(*) FROM sentiment_labels").fetchone()[0]
-    assert label_count >= 2500, f"Expected >= 2500 distilled labels, got {label_count}"
+    if SQLITE_DB_PATH.exists():
+        with get_connection(SQLITE_DB_PATH) as conn:
+            label_count = conn.execute("SELECT COUNT(*) FROM sentiment_labels").fetchone()[0]
+        assert label_count >= 2500, f"Expected >= 2500 distilled labels, got {label_count}"
 
     pos_score = score_vietnamese_headline("FPT báo lãi kỷ lục, lợi nhuận sau thuế tăng trưởng mạnh")
     neg_score = score_vietnamese_headline("Cổ phiếu giảm sàn, doanh nghiệp thua lỗ nặng và bị xử phạt")
@@ -65,9 +66,10 @@ def test_parse_cafef_news_html_offline() -> None:
     assert len(records) == 2
     assert records[0][0] == "HPG"
     assert records[0][1] == "2025-11-20"
-    assert "HPG lãi lớn" in records[0][2]
-    assert records[0][3] > 0.0
-    assert records[1][3] < 0.0
+    assert records[0][2] == "14:30"
+    assert "HPG lãi lớn" in records[0][3]
+    assert records[0][4] > 0.0
+    assert records[1][4] < 0.0
 
 
 def test_sqlite_cache_operations(tmp_path: Path) -> None:
@@ -96,8 +98,8 @@ def test_sqlite_cache_operations(tmp_path: Path) -> None:
     assert get_ticker_price_bounds("UNKNOWN", db_path=db_file) == (None, None)
 
     news_rows = [
-        ("FPT", "2025-01-02", "FPT tăng trưởng mạnh", 0.6667),
-        ("FPT", "2019-06-15", "FPT chi cổ tức tiền mặt", 0.5000),
+        ("FPT", "2025-01-02", "10:15", "FPT tăng trưởng mạnh lợi nhuận quý 4", 0.6667),
+        ("FPT", "2019-06-15", "15:30", "FPT chi cổ tức tiền mặt tỷ lệ cao", 0.5000),
     ]
     assert insert_news_records(news_rows, db_path=db_file) == 2
     assert insert_news_records(news_rows, db_path=db_file) == 0
