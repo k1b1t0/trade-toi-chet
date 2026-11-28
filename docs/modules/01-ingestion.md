@@ -4,25 +4,25 @@
 > **Notebook Minh họa**: `notebooks/01_data_crawling.ipynb`  
 > **Kiểm thử Tự động**: `tests/test_ingestion.py`  
 > **Ánh xạ Học phần IT4930 (`02-ds`)**:
-> - **Bài 2 (Lecture 2 — Thu thập dữ liệu & Web Crawling)**: Giao thức HTTP, kỹ thuật xoay vòng định danh trình duyệt (`User-Agent`), điều tiết tốc độ tải (`Polite Jitter Delay & Exponential Backoff`), phân tích cây DOM HTML bằng `BeautifulSoup4`.
-> - **Bài 8 (Lecture 8 — Quản trị Dữ liệu lớn)**: Tối ưu hóa lưu trữ bằng cơ sở dữ liệu nhúng `SQLite` kết hợp định dạng cột nén `Apache Parquet`.
-> - **Bài 10–11 (Lecture 10–11 — Phân tích Dữ liệu Văn bản)**: Lượng hóa sắc thái cảm xúc tiêu đề tin tức tài chính tiếng Việt bằng phương pháp từ điển chuyên ngành (Domain-Specific Sentiment Lexicon).
+> - **Bài 2 (Lecture 2 — Thu thập dữ liệu & Web Crawling)**: Giao thức HTTP, xoay vòng định danh trình duyệt (`User-Agent`), điều tiết tốc độ tải (`Polite Jitter Delay & Exponential Backoff`), phân tích cây DOM HTML bằng `BeautifulSoup4`, đồng bộ gia tăng (Incremental Watermark Sync).
+> - **Bài 8 (Lecture 8 — Quản trị Dữ liệu lớn)**: Kiến trúc lưu trữ kép kết hợp cơ sở dữ liệu nhúng `SQLite` (chống trùng lặp bằng khóa chính) và định dạng cột nén `Apache Parquet`.
+> - **Bài 10–11 (Lecture 10–11 — Phân tích Dữ liệu Văn bản)**: Lượng hóa sắc thái cảm xúc tiêu đề tin tức tài chính tiếng Việt bằng **LLM Knowledge Distillation** sang mô hình thống kê nhẹ **`TfidfVectorizer + LogisticRegression`** chia theo **Temporal Split** chống rò rỉ dữ liệu tương lai.
 
 ---
 
 ## 1. Tổng Quan & Mục Tiêu Thiết Kế
 
-Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa học Dữ liệu trong dự án **`TradeToiChet`**. Thay vì sử dụng một tập tin CSV tĩnh có sẵn, phân hệ này tự động thu thập và đồng bộ hóa **3 nguồn dữ liệu thực tế** của thị trường chứng khoán Việt Nam (giai đoạn `2019-01-01` đến `2026-03-01`):
+Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa học Dữ liệu trong dự án **`TradeToiChet`**, tự động thu thập và đồng bộ hóa **3 nguồn dữ liệu thực tế** của thị trường chứng khoán Việt Nam (giai đoạn `2019-01-01` đến `2026-11-20`):
 
-1. **Dữ liệu Giá & Khối lượng Lịch sử (`prices.parquet`)**: Chuỗi thời gian OHLCV theo ngày của **30 mã cổ phiếu rổ VN30** và chỉ số thị trường **VN-Index** (`54,681` bản ghi).
-2. **Dữ liệu Tin tức Tài chính & Điểm Cảm xúc (`news_sentiment.parquet`)**: Cào tự động `2,694` bài báo chuyên mục doanh nghiệp từ cổng thông tin **CafeF**, bóc tách thời gian đăng, tiêu đề và chấm điểm cảm xúc tiếng Việt rồi tổng hợp theo từng ngày giao dịch (`1,847` bản ghi ngày-mã).
-3. **Dữ liệu Thị trường & Kinh tế Vĩ mô (`macro.parquet`)**: Kết hợp tỷ suất sinh lời VN-Index, độ biến động trượt 20 phiên (`vnindex_volatility_20d` với 19 ngày đầu NaN tự nhiên, không dùng `bfill` để chống Look-ahead Bias), tỷ giá hối đoái `USD/VND` thực tế từ Yahoo Finance (`VND=X`) và lịch sử **Lãi suất tái cấp vốn của Ngân hàng Nhà nước Việt Nam (SBV)** (`1,751` ngày giao dịch).
+1. **Dữ liệu Giá & Khối lượng Lịch sử (`prices.parquet`)**: Chuỗi thời gian OHLCV theo ngày của **30 mã cổ phiếu rổ VN30** và chỉ số thị trường **VN-Index** (`60,354` bản ghi, `2019-01-02 → 2026-11-19`) từ API Entrade/DNSE.
+2. **Dữ liệu Tin tức Tài chính & Điểm Cảm xúc (`news_sentiment.parquet`)**: Cào tự động **`28,178` bài báo** doanh nghiệp thực tế từ cổng thông tin **CafeF** (phủ đều `3,000–4,255` bài/năm suốt `2019–2026`), chấm điểm cảm xúc bằng mô hình `.joblib` leak-free và tổng hợp theo ngày giao dịch (`18,249` bản ghi ngày–mã).
+3. **Dữ liệu Thị trường & Kinh tế Vĩ mô (`macro.parquet`)**: Kết hợp lợi nhuận VN-Index, độ biến động trượt 20 phiên (`vnindex_volatility_20d` với 19 ngày đầu `NaN` tự nhiên, không dùng `bfill`), tỷ giá hối đoái **`USD/VND` thực tế từ Yahoo Finance (`VND=X`)** và lịch sử **Lãi suất tái cấp vốn của Ngân hàng Nhà nước Việt Nam (SBV)** (`1,934` ngày giao dịch).
 
 ---
 
-## 2. Kiến Trúc Lưu Trữ Kép (SQLite Cache $\leftrightarrow$ Apache Parquet)
+## 2. Kiến Trúc Lưu Trữ Kép & Đồng Bộ Gia Tăng (SQLite Cache $\leftrightarrow$ Apache Parquet)
 
-Để giải quyết bài toán **không bao giờ phải cào lại dữ liệu từ đầu** và **triệt tiêu nguy cơ bị máy chủ chặn IP (IP Ban)** khi các thành viên chạy thử nghiệm nhiều lần, phân hệ được thiết kế theo kiến trúc lưu trữ kép:
+Để không bao giờ phải cào lại dữ liệu từ đầu, tránh quá tải API và triệt tiêu nguy cơ bị chặn IP (IP Ban), phân hệ sử dụng cơ chế **Incremental Watermark Sync** theo mốc ngày:
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -31,12 +31,14 @@ Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa h
                                       │
                                       ▼
                     ┌───────────────────────────────────┐
-                    │ 1. Kiểm tra SQLite Cache          │
+                    │ 1. Kiểm tra Watermark trong SQLite│
                     │    (data/tradetoichet.db)         │
+                    │  • Giá: [db_min, db_max] 2 đầu    │
+                    │  • Tin: dừng khi trùng hoặc < start│
                     └────────┬─────────────────┬────────┘
                              │                 │
-              [Đã đủ bản ghi]│                 │[Chưa có / Thiếu]
-               (Cache Hit)   │                 │ (Cache Miss)
+            [Đã phủ đủ ngày] │                 │[Thiếu đoạn start/end]
+              (Cache Hit)    │                 │ (Incremental Fetch)
                              │                 ▼
                              │   ┌──────────────────────────────────────────┐
                              │   │ 2. Anti-Ban HTTP Client (http_client.py) │
@@ -50,20 +52,20 @@ Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa h
                              │  ┌─────────────────────┐ ┌───────────────────────────┐
                              │  │ API Entrade / DNSE  │ │ HTML CafeF News Ajax      │
                              │  │ (OHLCV 30 mã VN30   │ │ BeautifulSoup4 DOM Parser │
-                             │  │  & chỉ số VNINDEX)  │ │ + Từ điển Cảm xúc TV      │
+                             │  │  & chỉ số VNINDEX)  │ │ + TF-IDF Sentiment .joblib│
                              │  └──────────┬──────────┘ └──────────────┬────────────┘
                              │             │                           │
                              │             └─────────────┬─────────────┘
                              │                           ▼
                              │             ┌───────────────────────────┐
                              │             │ 3. Ghi bền vững vào SQLite│
-                             │             │    (INSERT OR REPLACE)    │
+                             │             │ (INSERT OR REPLACE/IGNORE)│
                              │             └─────────────┬─────────────┘
                              │                           │
                              └─────────────┬─────────────┘
                                            ▼
                     ┌──────────────────────────────────────────────┐
-                    │ 4. Truy vấn chuẩn hóa & Xuất Apache Parquet  │
+                    │ 4. Lọc [start_date, end_date] & Xuất Parquet │
                     │    ├── data/raw/prices.parquet               │
                     │    ├── data/raw/news_sentiment.parquet       │
                     │    └── data/raw/macro.parquet                │
@@ -74,66 +76,85 @@ Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa h
 
 ## 3. Cấu Trúc Mã Nguồn & Đặc Tả Từng File Trong `src/ingestion/`
 
-Toàn bộ mã nguồn được chia thành **7 file nhỏ gọn** (mỗi file chỉ từ 30 đến 129 dòng), tuân thủ nghiêm ngặt nguyên tắc đơn nhiệm (Single Responsibility Principle):
+Toàn bộ mã nguồn được tổ chức thành **8 file gọn nhẹ**, phân tách trách nhiệm rõ ràng:
 
 | Tên File | Số dòng | Chức năng & Các hàm chính |
 |---|---|---|
-| [`src/ingestion/__init__.py`](../../src/ingestion/__init__.py) | 29 dòng | Giao diện public của package, cung cấp 2 hàm entrypoint chuẩn hợp đồng: `run_ingestion()` và `run_news_crawler()`. |
-| [`src/ingestion/db.py`](../../src/ingestion/db.py) | 107 dòng | Quản lý cơ sở dữ liệu `data/tradetoichet.db`:<br>- `init_db()`: Khởi tạo 3 bảng `prices`, `raw_news`, `macro` với khóa chính chống trùng lặp.<br>- `has_ticker_prices()`, `has_ticker_news()`: Kiểm tra nhanh một mã cổ phiếu đã có đủ dữ liệu trong DB chưa.<br>- `upsert_prices()`, `insert_news_records()`: Ghi dữ liệu theo lô (`executemany`) an toàn. |
-| [`src/ingestion/http_client.py`](../../src/ingestion/http_client.py) | 66 dòng | Tầng giao tiếp mạng chống chặn IP:<br>- `build_headers()`: Sinh HTTP Headers giả lập trình duyệt thực tế với `User-Agent` chọn ngẫu nhiên từ 6 cấu hình.<br>- `polite_sleep()`: Nghỉ ngẫu nhiên giữa các lần tải.<br>- `fetch_url()`: Tải JSON hoặc HTML với cơ chế thử lại lũy thừa (`2^attempt` giây) nếu gặp lỗi mạng hoặc HTTP 429/503. |
-| [`src/ingestion/price_fetcher.py`](../../src/ingestion/price_fetcher.py) | 94 dòng | Thu thập dữ liệu giá:<br>- `fetch_single_ticker_ohlcv()`: Gọi API nến ngày của từng mã, chuyển đổi Unix Timestamp sang ngày giao dịch theo múi giờ Việt Nam (`Asia/Ho_Chi_Minh`).<br>- `sync_all_prices()`: Đồng bộ 30 mã VN30 + `VNINDEX` vào SQLite và xuất file `data/raw/prices.parquet`. |
-| [`src/ingestion/macro_builder.py`](../../src/ingestion/macro_builder.py) | 129 dòng | Xây dựng dữ liệu vĩ mô:<br>- `_estimate_sbv_policy_rate()`: Ánh xạ lịch sử lãi suất tái cấp vốn của Ngân hàng Nhà nước Việt Nam qua các đợt điều chỉnh từ 2019 đến 2026.<br>- `_fetch_yahoo_usdvnd()`, `_estimate_usd_vnd_rate()`: Tải trực tiếp tỷ giá USD/VND thật từ Yahoo Finance API (`VND=X`), điền khuyết bằng `ffill()` (không dùng `bfill` chống rò rỉ dữ liệu).<br>- `build_macro_dataset()`: Tính lợi nhuận và độ biến động 20 phiên chuẩn toán học (`min_periods=20`) của VN-Index, ghép tỷ giá và lãi suất rồi xuất `data/raw/macro.parquet`. |
-| [`src/ingestion/sentiment.py`](../../src/ingestion/sentiment.py) | 43 dòng | Chấm điểm cảm xúc tiếng Việt:<br>- Khai báo bộ từ khóa tích cực (`POSITIVE_KEYWORDS`) và tiêu cực (`NEGATIVE_KEYWORDS`) đặc thù của báo chí chứng khoán Việt Nam.<br>- `score_vietnamese_headline()`: Trả về điểm cảm xúc chuẩn hóa trong đoạn `[-1.0, 1.0]`. |
-| [`src/ingestion/news_crawler.py`](../../src/ingestion/news_crawler.py) | 129 dòng | Trình cào dữ liệu Web (Web Crawler):<br>- `parse_cafef_news_html()`: Dùng `BeautifulSoup4` duyệt các thẻ `<li>`, lấy thời gian từ `<span class="timeTitle">` và tiêu đề từ `<a class="docnhanhTitle">`.<br>- `crawl_ticker_news()`, `sync_all_news()`: Cào tin theo từng mã, tự động quy đổi tin đăng cuối tuần (Thứ 7, Chủ nhật) về ngày Thứ 2 kế tiếp để khớp lịch giao dịch, rồi xuất `data/raw/news_sentiment.parquet`. |
-| [`src/ingestion/cli.py`](../../src/ingestion/cli.py) | 31 dòng | Giao diện dòng lệnh cho phép chạy toàn bộ hoặc từng phần của module Ingestion. |
+| [`src/ingestion/__init__.py`](../../src/ingestion/__init__.py) | 38 dòng | Giao diện public của package, cung cấp 2 entrypoint chuẩn hợp đồng: `run_ingestion()` và `run_news_crawler()`. |
+| [`src/ingestion/db.py`](../../src/ingestion/db.py) | 128 dòng | Quản lý `data/tradetoichet.db` gồm 4 bảng (`prices`, `raw_news`, `macro`, `sentiment_labels`):<br>- `get_ticker_price_bounds()`: Trả về `(min_date, max_date)` hiện có để kéo incremental 2 đầu.<br>- `upsert_prices()`, `insert_news_records()`: Ghi theo lô an toàn, chống trùng lặp bằng khóa chính. |
+| [`src/ingestion/http_client.py`](../../src/ingestion/http_client.py) | 71 dòng | Tầng giao tiếp mạng chống chặn IP: `build_headers()` (xoay 6 User-Agents), `polite_sleep()` và `fetch_url()` (retry exponential backoff `2^attempt` giây). |
+| [`src/ingestion/price_fetcher.py`](../../src/ingestion/price_fetcher.py) | 109 dòng | Thu thập OHLCV từ Entrade/DNSE (`fetch_single_ticker_ohlcv()`), chuẩn hóa múi giờ `Asia/Ho_Chi_Minh`. `sync_all_prices()` tự động kéo phần thiếu ở cả 2 đầu `[start_date, db_min]` và `[db_max, end_date]` rồi xuất `prices.parquet`. |
+| [`src/ingestion/macro_builder.py`](../../src/ingestion/macro_builder.py) | 133 dòng | Xây dựng bảng vĩ mô `macro.parquet`:<br>- `_fetch_yahoo_usdvnd()`, `_estimate_usd_vnd_rate()`: Tải tỷ giá USD/VND thật từ Yahoo Finance (`VND=X`), chỉ dùng `ffill()` (tuyệt đối không `bfill()`).<br>- `_estimate_sbv_policy_rate()`: Ánh xạ lịch sử lãi suất tái cấp vốn NHNN theo Quyết định chính thức.<br>- `build_macro_dataset()`: Tính lợi nhuận 1 ngày và độ biến động trượt 20 phiên (`min_periods=20`). |
+| [`src/ingestion/sentiment.py`](../../src/ingestion/sentiment.py) | 133 dòng | Chấm điểm cảm xúc tiếng Việt không dùng từ điển cứng:<br>- `train_and_save_sentiment_model()`: Đọc bảng `sentiment_labels`, chia **Temporal Split** (`<= 2024-12-31` train, `> 2024-12-31` test), lưu model ra `data/models/sentiment_tfidf.joblib`.<br>- `score_headlines_batch()`, `score_vietnamese_headline()`: Suy luận `< 0.1 ms/câu` qua `@lru_cache`. |
+| [`src/ingestion/news_crawler.py`](../../src/ingestion/news_crawler.py) | 161 dòng | Trình cào CafeF bằng `BeautifulSoup4` (`parse_cafef_news_html()`), dừng sớm theo watermark (`crawl_ticker_news()`), quy đổi tin cuối tuần về Thứ 2 kế tiếp, lọc đúng `[start_date, end_date]` và xuất `news_sentiment.parquet`. |
+| [`src/ingestion/cli.py`](../../src/ingestion/cli.py) | 46 dòng | Giao diện dòng lệnh hỗ trợ `--skip-prices`, `--skip-news`, `--start-date`, `--end-date`, `--pages`, `--tickers`. |
 
 ---
 
-## 4. Quy Trình LLM Knowledge Distillation & Mô Hình `.joblib` (`src/ingestion/sentiment.py`)
+## 4. Quy Trình LLM Knowledge Distillation & Mô Hình Sentiment (`src/ingestion/sentiment.py`)
 
-Thay vì viết tay từ điển cứng (hardcoded regex/keywords) hay phải chạy mô hình LLM nặng lúc runtime, phân hệ áp dụng quy trình **Chưng cất Tri thức từ LLM (LLM Knowledge Distillation)** sang mô hình thống kê nhẹ **`TfidfVectorizer + LogisticRegression`**:
+Thay vì viết tay từ điển từ khóa cứng hay gọi LLM nặng lúc runtime, phân hệ áp dụng **LLM Knowledge Distillation** sang mô hình nhẹ **`TfidfVectorizer + LogisticRegression`** tuân thủ nghiêm ngặt **Zero Look-Ahead Bias**:
 
-1. **Bước 1 — LLM Batch Annotation (Offline Distillation)**:
-   - Toàn bộ **2,526 tiêu đề tin tức độc nhất** cào thực tế từ CafeF trong bảng `raw_news` được chia thành 10 batches (~253 câu/batch) và gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` bằng 10 AI Subagents (`Gemini Flash Lite`).
-   - Kết quả phân phối nhãn thực tế lưu trong bảng `sentiment_labels` của `data/tradetoichet.db`:
-     - Nhãn `0` (Tin hành chính/thông báo định kỳ): `1,679` tiêu đề (`66.5%`)
-     - Nhãn `+1` (Tin tăng trưởng lợi nhuận/cổ tức/tích cực): `748` tiêu đề (`29.6%`)
-     - Nhãn `-1` (Tin sụt giảm/xử phạt/tiêu cực): `99` tiêu đề (`3.9%`)
-2. **Bước 2 — Huấn luyện & Đánh giá Hold-out 80/20**:
-   - Sử dụng `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=1, max_features=25000)` kết hợp `LogisticRegression(C=5.0, class_weight="balanced", random_state=42)`.
-   - Kết quả kiểm định trên 20% tập Test độc lập (`506` tiêu đề):
-     - **Accuracy**: **`88.14%`**
-     - **Macro F1-Score**: **`0.7869`**
-     - **Weighted F1-Score**: **`0.8836`** (Class `0` F1 = `0.9193`, Class `+1` F1 = `0.8415`, Class `-1` F1 = `0.6000`).
-   - Mô hình sau đó được fit trên 100% tập nhãn và đóng gói ra file **`data/models/sentiment_tfidf.joblib`**.
-3. **Bước 3 — Suy luận Runtime Siêu tốc (`< 0.1 ms/câu`)**:
-   - Hàm `score_vietnamese_headline()` và `score_headlines_batch()` load trực tiếp file `.joblib` qua bộ nhớ đệm `@lru_cache` và tính điểm liên tục:
-     $$\text{Sentiment Score}(h) = P(y = +1 \mid h) - P(y = -1 \mid h) \in [-1.0, +1.0]$$
+1. **Kho Nhãn Vàng (`sentiment_labels` trong SQLite)**:
+   - Tổng cộng **`4,917` tiêu đề độc nhất** khớp 100% với `raw_news` được gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` qua các batch AI Subagents (`Gemini Flash Lite`).
+   - Giai đoạn `2019–2024` được lấy mẫu phân tầng đều **`~400 bài/năm`** phủ đủ cả `30/30` mã VN30 (`2,440` mẫu huấn luyện).
+2. **Huấn luyện & Đánh giá Out-of-Time (Temporal Split)**:
+   - Pipeline: `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=2, max_features=30000)` + `LogisticRegression(C=5.0, class_weight="balanced", random_state=42)`.
+   - **Tập Train (`first_date <= 2024-12-31`)**: `2,440` tiêu đề (`2019–2024`). Model lưu ra `data/models/sentiment_tfidf.joblib` (`504.9 KB`) **chỉ fit trên tập Train này** (0% rò rỉ từ vựng tương lai).
+   - **Tập Out-of-Time Test (`first_date >= 2025-01-01`)**: `2,477` tiêu đề (`2025–2026`):
+     - **Accuracy**: **`83.73%`** | **Macro-F1**: **`0.7337`** | **Weighted-F1**: **`0.8433`**
+     - Class `-1` F1: `0.5224` (`support=97`), Class `0` F1: `0.8842` (`support=1,643`), Class `+1` F1: `0.7945` (`support=737`).
+3. **Công thức Suy luận Điểm Liên tục**:
+   $$\text{Sentiment Score}(h) = P(y = +1 \mid h) - P(y = -1 \mid h) \in [-1.0, +1.0]$$
 
 ---
 
-## 5. Thống Kê Bộ Dữ Liệu Thật Đã Thu Thập & Lưu Trữ
+## 5. Trích Dẫn Nguồn Lãi Suất Điều Hành SBV & Lưu Ý Học Thuật
 
-| Tập tin Lưu trữ | Định dạng | Dung lượng | Số dòng $\times$ Số cột | Khóa chính | Mô tả Nội dung |
+### 5.1. Lịch sử Lãi suất Tái cấp vốn NHNN Việt Nam (`sbv_policy_rate`)
+Vì cổng thông tin Ngân hàng Nhà nước Việt Nam (`sbv.gov.vn`) chỉ công bố Quyết định dưới dạng văn bản pháp quy (không có public JSON API lịch sử theo ngày), cột `sbv_policy_rate` ánh xạ chính xác hàm bậc thang theo từng Quyết định điều hành chính thức của SBV giai đoạn `2019–2026`:
+
+| Ngày hiệu lực | Mức lãi suất tái cấp vốn (%/năm) | Nguồn Quyết định SBV |
+|---|---:|---|
+| Trước `2019-09-16` | `6.25%` | QĐ 1424/QĐ-NHNN (2017) |
+| `2019-09-16` | `6.00%` | QĐ 1870/QĐ-NHNN |
+| `2020-03-17` | `5.00%` | QĐ 418/QĐ-NHNN |
+| `2020-05-13` | `4.50%` | QĐ 918/QĐ-NHNN |
+| `2020-10-01` | `4.00%` | QĐ 1728/QĐ-NHNN |
+| `2022-09-23` | `5.00%` | QĐ 1606/QĐ-NHNN |
+| `2022-10-25` | `6.00%` | QĐ 1809/QĐ-NHNN |
+| `2023-04-03` | `5.50%` | QĐ 574/QĐ-NHNN |
+| `2023-05-25` | `5.00%` | QĐ 950/QĐ-NHNN |
+| `2023-06-19` → `2026-11-20` | `4.50%` | QĐ 1123/QĐ-NHNN (giữ ổn định xuyên suốt `2024–2026`) |
+
+### 5.2. Lưu ý Học thuật (Limitations)
+- **Survivorship Bias (Thiên lệch kẻ sống sót)**: Danh mục `VN30_TICKERS` trong `src/config.py` sử dụng rổ 30 mã VN30 cố định tại thời điểm nghiên cứu để truy xuất ngược về `2019` (tương đồng với phương pháp của các nghiên cứu SOTA `Nature 2024` và `PLOS ONE 2025`), chưa mô phỏng sự thay đổi thành phần rổ VN30 qua từng kỳ tái cơ cấu lịch sử.
+
+---
+
+## 6. Thống Kê Bộ Dữ Liệu Thật Đã Thu Thập & Lưu Trữ
+
+| Tập tin Lưu trữ | Định dạng | Dung lượng | Số dòng $\times$ Số cột | Khung ngày | Mô tả Nội dung |
 |---|---|---|---|---|---|
-| `data/tradetoichet.db` | SQLite 3 | `5.9 MB` | 3 bảng (`prices`, `raw_news`, `macro`) | Khóa riêng từng bảng | Kho lưu trữ gốc chứa `54,681` dòng giá và `2,694` bài báo CafeF nguyên bản. |
-| `data/raw/prices.parquet` | Apache Parquet | `951 KB` | `54,681 rows x 8 cols` | `(date, ticker)` | Dữ liệu OHLCV + nhóm ngành (`sector`) của 30 mã VN30 và `VNINDEX`. |
-| `data/raw/news_sentiment.parquet` | Apache Parquet | `85 KB` | `1,847 rows x 5 cols` | `(date, ticker)` | Số lượng tin trong ngày (`news_count`), điểm cảm xúc `[-1, 1]` và tiêu đề mẫu. |
-| `data/raw/macro.parquet` | Apache Parquet | `72 KB` | `1,751 rows x 6 cols` | `(date)` | Điểm số VN-Index, lợi nhuận 1 ngày, biến động 20 phiên, tỷ giá USD/VND, lãi suất SBV. |
+| `data/tradetoichet.db` | SQLite 3 | `16.11 MB` | 4 bảng (`prices`, `raw_news`, `macro`, `sentiment_labels`) | `2019-01-02 → 2026-11-20` | Kho lưu trữ gốc chứa `60,354` dòng giá, `28,179` bài báo và `4,917` nhãn LLM sạch. |
+| `data/raw/prices.parquet` | Apache Parquet | `1,067.3 KB` | `60,354 rows x 8 cols` | `2019-01-02 → 2026-11-19` | Dữ liệu OHLCV + nhóm ngành (`sector`) của 30 mã VN30 và `VNINDEX`. |
+| `data/raw/news_sentiment.parquet` | Apache Parquet | `779.8 KB` | `18,249 rows x 5 cols` | `2019-01-02 → 2026-11-20` | Số lượng tin trong ngày (`news_count`), điểm cảm xúc `[-1, 1]` và tiêu đề mẫu. |
+| `data/raw/macro.parquet` | Apache Parquet | `72.5 KB` | `1,934 rows x 6 cols` | `2019-01-02 → 2026-11-19` | Điểm số VN-Index, lợi nhuận 1 ngày, biến động 20 phiên, tỷ giá USD/VND, lãi suất SBV. |
+| `data/models/sentiment_tfidf.joblib` | Joblib | `504.9 KB` | Pipeline TF-IDF + LR | Fit `<= 2024-12-31` | Mô hình cảm xúc tiếng Việt đã chưng cất từ LLM, chống rò rỉ tương lai. |
 
 ---
 
-## 6. Hướng Dẫn Chạy & Kiểm Thử Module Ingestion
+## 7. Hướng Dẫn Chạy & Kiểm Thử Module Ingestion
 
 ```bash
-# 1. Chạy toàn bộ pipeline thu thập dữ liệu (sẽ tự động dùng SQLite cache nếu đã tải)
+# 1. Chạy toàn bộ pipeline thu thập dữ liệu (tự động incremental sync từ SQLite cache)
 uv run python -m src.ingestion.cli
 
 # 2. Chỉ chạy phần kéo giá OHLCV & Vĩ mô (bỏ qua cào tin tức)
 uv run python -m src.ingestion.cli --skip-news
 
-# 3. Chỉ chạy phần cào tin tức CafeF (tùy chỉnh số trang cào mỗi mã)
-uv run python -m src.ingestion.cli --skip-prices --pages 3
+# 3. Chỉ chạy phần cào tin tức CafeF (tùy chỉnh số trang tối đa mỗi mã)
+uv run python -m src.ingestion.cli --skip-prices --pages 60
 
 # 4. Chạy bộ kiểm thử tự động (Unit tests + Data Contract tests)
 uv run pytest tests/test_ingestion.py -v
