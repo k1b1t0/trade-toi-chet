@@ -6,8 +6,10 @@ ket hop chuoi vnindex voi lich su lai suat dieu hanh sbv va ty gia usd/vnd.
 import json
 import urllib.request
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
 from src.config import BENCHMARK_TICKER, DATA_RAW_DIR, SQLITE_DB_PATH
 from src.ingestion.db import get_connection, init_db
 

@@ -5,7 +5,9 @@ giup tranh cao lai tu dau va ngan chan nguy co bi ban ip khi chay nhieu lan.
 
 import sqlite3
 from pathlib import Path
+
 import pandas as pd
+
 from src.config import SQLITE_DB_PATH
 
 
@@ -67,23 +69,24 @@ def init_db(db_path: Path = SQLITE_DB_PATH) -> None:
         conn.commit()
 
 
-def has_ticker_prices(
-    ticker: str, min_rows: int = 500, db_path: Path = SQLITE_DB_PATH
-) -> bool:
+def has_ticker_prices(ticker: str, min_rows: int = 500, db_path: Path = SQLITE_DB_PATH) -> bool:
     """kiem tra xem ma co phieu da co du du lieu gia trong sqlite chua."""
     with get_connection(db_path) as conn:
-        cur = conn.execute("SELECT COUNT(*) FROM prices WHERE ticker = ?", (ticker,))
-        count = cur.fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM prices WHERE ticker = ?", (ticker,)).fetchone()[0]
     return count >= min_rows
 
 
-def has_ticker_news(
-    ticker: str, min_rows: int = 15, db_path: Path = SQLITE_DB_PATH
-) -> bool:
+def get_ticker_price_bounds(ticker: str, db_path: Path = SQLITE_DB_PATH) -> tuple[str | None, str | None]:
+    """tra ve moc ngay (min_date, max_date) hien co trong bang prices cua 1 ma."""
+    with get_connection(db_path) as conn:
+        row = conn.execute("SELECT MIN(date), MAX(date) FROM prices WHERE ticker = ?", (ticker,)).fetchone()
+    return (row[0], row[1]) if row else (None, None)
+
+
+def has_ticker_news(ticker: str, min_rows: int = 15, db_path: Path = SQLITE_DB_PATH) -> bool:
     """kiem tra xem ma co phieu da cao du tin tuc trong sqlite chua."""
     with get_connection(db_path) as conn:
-        cur = conn.execute("SELECT COUNT(*) FROM raw_news WHERE ticker = ?", (ticker,))
-        count = cur.fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM raw_news WHERE ticker = ?", (ticker,)).fetchone()[0]
     return count >= min_rows
 
 
@@ -108,11 +111,12 @@ def upsert_prices(df: pd.DataFrame, db_path: Path = SQLITE_DB_PATH) -> None:
 
 def insert_news_records(
     records: list[tuple[str, str, str, float]], db_path: Path = SQLITE_DB_PATH
-) -> None:
-    """luu danh sach tin tuc (ticker, pub_date, headline, sentiment_score) vao sqlite."""
+) -> int:
+    """luu danh sach tin tuc vao sqlite, bo qua ban ghi trung va tra ve so dong moi chen."""
     if not records:
-        return
+        return 0
     with get_connection(db_path) as conn:
+        before = conn.total_changes
         conn.executemany(
             """
             INSERT OR IGNORE INTO raw_news (ticker, pub_date, headline, sentiment_score)
@@ -121,3 +125,4 @@ def insert_news_records(
             records,
         )
         conn.commit()
+        return conn.total_changes - before
