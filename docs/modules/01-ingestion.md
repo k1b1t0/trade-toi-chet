@@ -14,9 +14,9 @@
 
 Phân hệ `src/ingestion/` là tầng đầu tiên của đường ống Khoa học Dữ liệu trong dự án **`TradeToiChet`**, tự động thu thập và đồng bộ hóa **3 nguồn dữ liệu thực tế** của thị trường chứng khoán Việt Nam (giai đoạn `2019-01-01` đến `2026-11-20`):
 
-1. **Dữ liệu Giá & Khối lượng Lịch sử (`prices.parquet`)**: Chuỗi thời gian OHLCV theo ngày của **30 mã cổ phiếu rổ VN30** và chỉ số thị trường **VN-Index** (`60,354` bản ghi, `2019-01-02 → 2026-11-19`) từ API Entrade/DNSE.
-2. **Dữ liệu Tin tức Tài chính & Điểm Cảm xúc (`news_sentiment.parquet`)**: Cào tự động **`28,178` bài báo** doanh nghiệp thực tế từ cổng thông tin **CafeF** (phủ đều `3,000–4,255` bài/năm suốt `2019–2026`), chấm điểm cảm xúc bằng mô hình `.joblib` leak-free và tổng hợp theo ngày giao dịch (`18,249` bản ghi ngày–mã).
-3. **Dữ liệu Thị trường & Kinh tế Vĩ mô (`macro.parquet`)**: Kết hợp lợi nhuận VN-Index, độ biến động trượt 20 phiên (`vnindex_volatility_20d` với 19 ngày đầu `NaN` tự nhiên, không dùng `bfill`), tỷ giá hối đoái **`USD/VND` thực tế từ Yahoo Finance (`VND=X`)** và lịch sử **Lãi suất tái cấp vốn của Ngân hàng Nhà nước Việt Nam (SBV)** (`1,934` ngày giao dịch).
+1. **Dữ liệu Giá & Khối lượng Lịch sử (`prices.parquet`)**: Chuỗi thời gian OHLCV theo ngày của **30 mã cổ phiếu rổ VN30** và chỉ số thị trường **VN-Index** (`60,385` bản ghi, `2019-01-02 → 2026-11-20`, `datetime64[ns]`) từ API Entrade/DNSE.
+2. **Dữ liệu Tin tức Tài chính & Điểm Cảm xúc (`news_sentiment.parquet`)**: Cào tự động **`28,828` bài báo** doanh nghiệp thực tế từ cổng thông tin **CafeF** kèm giờ đăng `HH:mm` (dời tin `>= 14:45` sau giờ đóng cửa HOSE, cuối tuần và lễ/Tết sang phiên giao dịch kế tiếp gần nhất), chấm điểm cảm xúc bằng mô hình `.joblib` leak-free và tổng hợp theo ngày giao dịch (`18,160` bản ghi ngày–mã, 0 dòng lệch lịch phiên).
+3. **Dữ liệu Thị trường & Kinh tế Vĩ mô (`macro.parquet`)**: Kết hợp lợi nhuận VN-Index (reindex theo đủ **`1,968`** phiên giao dịch VN30 + `ffill` lấp 33 ngày thiếu từ API, không `bfill`), độ biến động trượt 20 phiên (`vnindex_volatility_20d` với 19 ngày đầu `NaN` tự nhiên), tỷ giá **`USD/VND` thực tế từ Yahoo Finance (`VND=X`)** và lịch sử **Lãi suất tái cấp vốn của Ngân hàng Nhà nước Việt Nam (SBV)**.
 
 ---
 
@@ -95,15 +95,15 @@ Toàn bộ mã nguồn được tổ chức thành **8 file gọn nhẹ**, phân
 
 Thay vì viết tay từ điển từ khóa cứng hay gọi LLM nặng lúc runtime, phân hệ áp dụng **LLM Knowledge Distillation** sang mô hình nhẹ **`TfidfVectorizer + LogisticRegression`** tuân thủ nghiêm ngặt **Zero Look-Ahead Bias**:
 
-1. **Kho Nhãn Vàng (`sentiment_labels` trong SQLite)**:
-   - Tổng cộng **`4,917` tiêu đề độc nhất** khớp 100% với `raw_news` được gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` qua các batch AI Subagents (`Gemini Flash Lite`).
-   - Giai đoạn `2019–2024` được lấy mẫu phân tầng đều **`~400 bài/năm`** phủ đủ cả `30/30` mã VN30 (`2,440` mẫu huấn luyện).
-2. **Huấn luyện & Đánh giá Out-of-Time (Temporal Split)**:
+1. **Kho Nhãn Vàng (`data/raw/sentiment_labels.parquet` & SQLite)**:
+   - Tổng cộng **`4,917` tiêu đề độc nhất** được gán nhãn ngữ cảnh tài chính `{-1: Tiêu cực, 0: Trung lập, +1: Tích cực}` qua các batch AI Subagents (`Gemini Flash Lite`).
+   - Giai đoạn `2019–2023` được lấy mẫu phân tầng đều **`~400 bài/năm`** phủ đủ cả `30/30` mã VN30 (`2,022` mẫu huấn luyện).
+2. **Huấn luyện & Đánh giá Out-of-Time (Temporal Split — 0% Leak cho cả Val 2024 & Test 2025–2026)**:
    - Pipeline: `TfidfVectorizer(ngram_range=(1, 3), sublinear_tf=True, min_df=2, max_features=30000)` + `LogisticRegression(C=5.0, class_weight="balanced", random_state=42)`.
-   - **Tập Train (`first_date <= 2024-12-31`)**: `2,440` tiêu đề (`2019–2024`). Model lưu ra `data/models/sentiment_tfidf.joblib` (`504.9 KB`) **chỉ fit trên tập Train này** (0% rò rỉ từ vựng tương lai).
-   - **Tập Out-of-Time Test (`first_date >= 2025-01-01`)**: `2,477` tiêu đề (`2025–2026`):
-     - **Accuracy**: **`83.73%`** | **Macro-F1**: **`0.7337`** | **Weighted-F1**: **`0.8433`**
-     - Class `-1` F1: `0.5224` (`support=97`), Class `0` F1: `0.8842` (`support=1,643`), Class `+1` F1: `0.7945` (`support=737`).
+   - **Tập Train (`first_date <= 2023-12-31`)**: `2,022` tiêu đề (`2019–2023`). Model lưu ra `data/models/sentiment_tfidf.joblib` **chỉ fit trên tập Train này** (0% rò rỉ vào tập Validation 2024 lẫn Test 2025–2026).
+   - **Tập Out-of-Time Eval (`first_date >= 2024-01-01`)**: `2,895` tiêu đề (`2024–2026`):
+     - **Accuracy**: **`83.90%`** | **Macro-F1**: **`0.7305`** | **Weighted-F1**: **`0.8443`**
+     - Class `-1` F1: `0.5050` (`support=125`), Class `0` F1: `0.8883` (`support=1,886`), Class `+1` F1: `0.7983` (`support=884`).
 3. **Công thức Suy luận Điểm Liên tục**:
    $$\text{Sentiment Score}(h) = P(y = +1 \mid h) - P(y = -1 \mid h) \in [-1.0, +1.0]$$
 
@@ -136,11 +136,12 @@ Vì cổng thông tin Ngân hàng Nhà nước Việt Nam (`sbv.gov.vn`) chỉ c
 
 | Tập tin Lưu trữ | Định dạng | Dung lượng | Số dòng $\times$ Số cột | Khung ngày | Mô tả Nội dung |
 |---|---|---|---|---|---|
-| `data/tradetoichet.db` | SQLite 3 | `16.11 MB` | 4 bảng (`prices`, `raw_news`, `macro`, `sentiment_labels`) | `2019-01-02 → 2026-11-20` | Kho lưu trữ gốc chứa `60,354` dòng giá, `28,179` bài báo và `4,917` nhãn LLM sạch. |
-| `data/raw/prices.parquet` | Apache Parquet | `1,067.3 KB` | `60,354 rows x 8 cols` | `2019-01-02 → 2026-11-19` | Dữ liệu OHLCV + nhóm ngành (`sector`) của 30 mã VN30 và `VNINDEX`. |
-| `data/raw/news_sentiment.parquet` | Apache Parquet | `779.8 KB` | `18,249 rows x 5 cols` | `2019-01-02 → 2026-11-20` | Số lượng tin trong ngày (`news_count`), điểm cảm xúc `[-1, 1]` và tiêu đề mẫu. |
-| `data/raw/macro.parquet` | Apache Parquet | `72.5 KB` | `1,934 rows x 6 cols` | `2019-01-02 → 2026-11-19` | Điểm số VN-Index, lợi nhuận 1 ngày, biến động 20 phiên, tỷ giá USD/VND, lãi suất SBV. |
-| `data/models/sentiment_tfidf.joblib` | Joblib | `504.9 KB` | Pipeline TF-IDF + LR | Fit `<= 2024-12-31` | Mô hình cảm xúc tiếng Việt đã chưng cất từ LLM, chống rò rỉ tương lai. |
+| `data/raw/prices.parquet` | Apache Parquet | `1,032.3 KB` | `60,385 rows x 8 cols` | `2019-01-02 → 2026-11-20` | Dữ liệu OHLCV + nhóm ngành (`sector`) của 30 mã VN30 và `VNINDEX` (`datetime64[ns]`). |
+| `data/raw/news_sentiment.parquet` | Apache Parquet | `785.6 KB` | `18,160 rows x 5 cols` | `2019-01-02 → 2026-11-20` | Số lượng tin (`news_count`), điểm cảm xúc `[-1, 1]` và tiêu đề mẫu (đã dời `>= 14:45` & lễ/Tết). |
+| `data/raw/macro.parquet` | Apache Parquet | `73.9 KB` | `1,968 rows x 6 cols` | `2019-01-02 → 2026-11-20` | Điểm số VN-Index (reindex đủ 1,968 phiên + `ffill`), lợi nhuận 1d, vol 20d, USD/VND, SBV. |
+| `data/raw/sentiment_labels.parquet` | Apache Parquet | `~150 KB` | `4,917 rows x 3 cols` | `2019-01-02 → 2026-11-20` | Kho nhãn vàng LLM (`headline`, `llm_label`, `first_date`) để tái lập model mà không cần commit SQLite. |
+| `data/models/sentiment_tfidf.joblib` | Joblib | `~450 KB` | Pipeline TF-IDF + LR | Fit `<= 2023-12-31` | Mô hình cảm xúc tiếng Việt leak-free cho cả Val (2024) và Test (2025–2026). |
+| `data/tradetoichet.db` *(local cache, `.gitignore`)* | SQLite 3 | `~17 MB` | 4 bảng | Local only | Cache cục bộ tránh cào lại, không push lên Git để giữ repo nhẹ. |
 
 ---
 
